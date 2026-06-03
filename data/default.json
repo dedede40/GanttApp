@@ -1,0 +1,24 @@
+{
+  "engines": [
+    { "id": "1868", "color": "#4A90D9", "initial_hours": 12000 },
+    { "id": "2445", "color": "#E8852A", "initial_hours":  8000 },
+    { "id": "2446", "color": "#2EAA60", "initial_hours":  5000 },
+    { "id": "2450", "color": "#9B5BB5", "initial_hours":  3000 }
+  ],
+  "machines": [
+    { "id": "1", "name": "1号機" },
+    { "id": "2", "name": "2号機" },
+    { "id": "3", "name": "3号機" }
+  ],
+  "schedule": {
+    "machine_bars": [
+      { "machine_id": "1", "engine_id": "1868", "start": "20250101", "end": "20261231", "operation_rate": 0.80 },
+      { "machine_id": "1", "engine_id": "2445", "start": "20270101", "end": "20341231", "operation_rate": 0.80 },
+      { "machine_id": "2", "engine_id": "2446", "start": "20250101", "end": "20341231", "operation_rate": 0.75 },
+      { "machine_id": "3", "engine_id": "2450", "start": "20250101", "end": "20341231", "operation_rate": 0.80 }
+    ],
+    "maintenance_bars": [
+      { "engine_id": "2445", "start": "20250101", "end": "20261231", "status": "12k点検" }
+    ]
+  }
+}

@@ -1,0 +1,394 @@
+"""GanttApp main window and entry point."""
+import copy
+import json
+import os
+import shutil
+import sys
+from datetime import date, timedelta
+from pathlib import Path
+from tkinter import filedialog, messagebox
+import tkinter as tk
+from tkinter import ttk
+
+from models import AppData, MachineBar, MaintenanceBar, MACHINE_IDS, PERIOD_START, PERIOD_END
+from data_io import load_json, save_json
+from validation import validate
+from gantt_canvas import GanttCanvas
+from summary_panel import SummaryPanel
+from dialogs import (
+    NewFileWizard, EditMachineBarDialog, EditMaintenanceBarDialog,
+    AddMaintenanceBarDialog, InsertEngineDialog, SettingsDialog,
+)
+
+# ── Paths ─────────────────────────────────────────────────────────────────────
+
+def _app_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).parent
+    return Path(__file__).parent
+
+
+APP_DIR     = _app_dir()
+DATA_DIR    = APP_DIR / "data"
+SAVE_DIR    = APP_DIR / "save"
+DEFAULT_JSON = DATA_DIR / "default.json"
+PREFS_FILE  = APP_DIR / ".gantt_prefs.json"
+
+
+def _load_prefs() -> dict:
+    try:
+        return json.loads(PREFS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _save_prefs(data: dict) -> None:
+    try:
+        PREFS_FILE.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+
+# ── Main window ───────────────────────────────────────────────────────────────
+
+class GanttApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("GanttApp")
+        self.minsize(900, 540)
+        self.geometry("1280x780")
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        self._app_data: AppData | None = None
+        self._file_path: str | None = None
+        self._modified  = False
+
+        self._build_menu()
+        self._build_ui()
+
+        # Ensure save dir exists
+        SAVE_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Auto-load last file
+        prefs = _load_prefs()
+        last  = prefs.get("last_file")
+        if last and Path(last).exists():
+            self._load_file(last)
+        else:
+            self._show_empty()
+
+    # ── UI construction ──────────────────────────────────────────────────────
+
+    def _build_menu(self) -> None:
+        mb = tk.Menu(self)
+        self.config(menu=mb)
+
+        file_menu = tk.Menu(mb, tearoff=0)
+        mb.add_cascade(label="ファイル", menu=file_menu)
+        file_menu.add_command(label="新規作成…",     command=self._new_file,        accelerator="Ctrl+N")
+        file_menu.add_command(label="開く…",         command=self._open_file,       accelerator="Ctrl+O")
+        file_menu.add_separator()
+        file_menu.add_command(label="上書き保存",    command=self._save_file,       accelerator="Ctrl+S")
+        file_menu.add_command(label="名前を付けて保存…", command=self._save_as,     accelerator="Ctrl+Shift+S")
+        file_menu.add_separator()
+        file_menu.add_command(label="終了",          command=self._on_close)
+
+        edit_menu = tk.Menu(mb, tearoff=0)
+        mb.add_cascade(label="編集", menu=edit_menu)
+        edit_menu.add_command(label="別枠バーを追加…", command=self._add_maint_bar)
+        edit_menu.add_separator()
+        edit_menu.add_command(label="スケジュール検証", command=self._validate_now)
+
+        settings_menu = tk.Menu(mb, tearoff=0)
+        mb.add_cascade(label="設定", menu=settings_menu)
+        settings_menu.add_command(label="エンジン色の設定…", command=self._open_settings)
+
+        self.bind_all("<Control-n>", lambda _: self._new_file())
+        self.bind_all("<Control-o>", lambda _: self._open_file())
+        self.bind_all("<Control-s>", lambda _: self._save_file())
+        self.bind_all("<Control-S>", lambda _: self._save_as())
+
+    def _build_ui(self) -> None:
+        self._paned = tk.PanedWindow(self, orient="vertical", sashwidth=6,
+                                     bg="#D0D8E8", sashrelief="flat")
+        self._paned.pack(fill="both", expand=True)
+
+        self._gantt_frame = tk.Frame(self._paned, bg="white")
+        self._paned.add(self._gantt_frame, minsize=300, stretch="always")
+
+        self._summary_frame = tk.Frame(self._paned)
+        self._paned.add(self._summary_frame, minsize=140, stretch="never")
+
+        self._gantt:   GanttCanvas | None = None
+        self._summary: SummaryPanel | None = None
+
+        # Status bar
+        self._status_var = tk.StringVar(value="ファイルを開いてください")
+        status_bar = tk.Label(self, textvariable=self._status_var,
+                              anchor="w", padx=8, bg="#E8EDF5",
+                              relief="sunken", font=("Meiryo UI", 8))
+        status_bar.pack(side="bottom", fill="x")
+
+    # ── Data loading ─────────────────────────────────────────────────────────
+
+    def _show_empty(self) -> None:
+        lbl = tk.Label(self._gantt_frame,
+                       text="ファイル > 新規作成、または ファイル > 開く でスケジュールを読み込んでください",
+                       fg="#888", font=("Meiryo UI", 12))
+        lbl.place(relx=0.5, rely=0.5, anchor="center")
+
+    def _load_file(self, path: str) -> None:
+        try:
+            app_data = load_json(path)
+        except Exception as e:
+            result = messagebox.askquestion(
+                "読み込みエラー",
+                f"データの読み込みに失敗しました。ファイルが破損している可能性があります。\n\n"
+                f"詳細: {e}\n\n"
+                "デフォルトデータを読み込みますか？",
+                parent=self,
+            )
+            if result == "yes":
+                try:
+                    app_data = load_json(str(DEFAULT_JSON))
+                    path = None
+                except Exception:
+                    return
+            else:
+                return
+
+        self._app_data  = app_data
+        self._file_path = path
+        self._modified  = False
+        self._rebuild_widgets()
+        self._update_title()
+        if path:
+            _save_prefs({"last_file": path})
+        self._status_var.set(f"読み込み完了: {path or 'デフォルトデータ'}")
+
+    def _rebuild_widgets(self) -> None:
+        if self._app_data is None:
+            return
+        # Clear frames
+        for w in self._gantt_frame.winfo_children():
+            w.destroy()
+        for w in self._summary_frame.winfo_children():
+            w.destroy()
+
+        self._gantt = GanttCanvas(
+            self._gantt_frame,
+            self._app_data,
+            on_change=self._on_data_change,
+            open_edit_dialog=self._open_edit_dialog,
+        )
+        self._gantt.pack(fill="both", expand=True)
+
+        self._summary = SummaryPanel(self._summary_frame, self._app_data)
+        self._summary.pack(fill="both", expand=True)
+
+    # ── Dirty tracking ────────────────────────────────────────────────────────
+
+    def _on_data_change(self) -> None:
+        self._modified = True
+        self._update_title()
+        if self._summary:
+            self._summary.refresh()
+
+    def _update_title(self) -> None:
+        fname = Path(self._file_path).name if self._file_path else "新規ファイル"
+        star  = "*" if self._modified else ""
+        self.title(f"{fname}{star} - GanttApp")
+
+    # ── File operations ──────────────────────────────────────────────────────
+
+    def _new_file(self) -> None:
+        if not self._confirm_discard():
+            return
+        NewFileWizard(self, callback=self._on_wizard_done)
+
+    def _on_wizard_done(self, app_data: AppData) -> None:
+        self._app_data  = app_data
+        self._file_path = None
+        self._modified  = True
+        self._rebuild_widgets()
+        self._update_title()
+
+    def _open_file(self) -> None:
+        if not self._confirm_discard():
+            return
+        path = filedialog.askopenfilename(
+            title="ファイルを開く",
+            initialdir=str(SAVE_DIR),
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+        )
+        if path:
+            self._load_file(path)
+
+    def _save_file(self) -> None:
+        if self._app_data is None:
+            return
+        if self._file_path is None:
+            self._save_as()
+            return
+        errors = validate(self._app_data)
+        if errors:
+            messagebox.showerror("検証エラー",
+                                 "スケジュールに問題があります。保存できません。\n\n" +
+                                 "\n".join(f"• {e}" for e in errors), parent=self)
+            return
+        save_json(self._app_data, self._file_path)
+        self._modified = False
+        self._update_title()
+        self._status_var.set(f"保存しました: {self._file_path}")
+
+    def _save_as(self) -> None:
+        if self._app_data is None:
+            return
+        errors = validate(self._app_data)
+        if errors:
+            messagebox.showerror("検証エラー",
+                                 "スケジュールに問題があります。保存できません。\n\n" +
+                                 "\n".join(f"• {e}" for e in errors), parent=self)
+            return
+        path = filedialog.asksaveasfilename(
+            title="名前を付けて保存",
+            initialdir=str(SAVE_DIR),
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+        )
+        if path:
+            save_json(self._app_data, path)
+            self._file_path = path
+            self._modified  = False
+            self._update_title()
+            _save_prefs({"last_file": path})
+            self._status_var.set(f"保存しました: {path}")
+
+    def _confirm_discard(self) -> bool:
+        if not self._modified:
+            return True
+        result = messagebox.askyesnocancel(
+            "未保存の変更", "保存されていない変更があります。保存しますか？", parent=self)
+        if result is None:
+            return False  # cancel
+        if result:
+            self._save_file()
+        return True
+
+    def _on_close(self) -> None:
+        if self._confirm_discard():
+            self.destroy()
+
+    # ── Edit dialogs (called from canvas) ────────────────────────────────────
+
+    def _open_edit_dialog(self, kind: str, idx: int, seg_or_date) -> None:
+        if self._app_data is None:
+            return
+        if kind == "machine":
+            bar = self._app_data.machine_bars[idx]
+            EditMachineBarDialog(self, bar, on_save=self._on_machine_bar_saved)
+        elif kind == "maint":
+            bar = self._app_data.maintenance_bars[idx]
+            EditMaintenanceBarDialog(self, bar, on_save=self._on_maint_bar_saved)
+        elif kind == "insert":
+            split_date = seg_or_date  # date object passed from canvas
+            InsertEngineDialog(
+                self, self._app_data, idx, split_date,
+                on_save=self._on_insert_engine,
+            )
+
+    def _on_machine_bar_saved(self, bar: MachineBar) -> None:
+        # Bar is already modified in-place; validate adjacency
+        errors = self._validate_machine_adjacency(bar)
+        if errors:
+            messagebox.showwarning("警告", "\n".join(errors), parent=self)
+        self._on_data_change()
+        if self._gantt:
+            self._gantt.redraw()
+
+    def _validate_machine_adjacency(self, bar: MachineBar) -> list[str]:
+        """Light check that this machine still has no gaps."""
+        bars = sorted(
+            [b for b in self._app_data.machine_bars if b.machine_id == bar.machine_id],
+            key=lambda b: b.start,
+        )
+        errors = []
+        for i in range(len(bars) - 1):
+            if bars[i].end + timedelta(days=1) != bars[i + 1].start:
+                errors.append(
+                    f"{bars[i].engine_id} → {bars[i+1].engine_id} 間に隙間または重複があります"
+                )
+        return errors
+
+    def _on_maint_bar_saved(self, bar: MaintenanceBar) -> None:
+        self._on_data_change()
+        if self._gantt:
+            self._gantt.redraw()
+
+    def _on_insert_engine(self, bar_idx: int, split_date: date, new_engine_id: str) -> None:
+        """Split machine bar at split_date, replacing tail with new_engine_id."""
+        bars  = self._app_data.machine_bars
+        bar   = bars[bar_idx]
+        mid   = bar.machine_id
+
+        if split_date <= bar.start or split_date > bar.end:
+            messagebox.showerror("エラー", "交換日がバーの期間外です。", parent=self)
+            return
+
+        # Shrink current bar
+        old_end   = bar.end
+        bar.end   = split_date - timedelta(days=1)
+
+        # New bar takes from split_date to original end
+        new_bar   = MachineBar(
+            machine_id=mid, engine_id=new_engine_id,
+            start=split_date, end=old_end, operation_rate=0.8,
+        )
+        # Insert after current bar index
+        bars.insert(bar_idx + 1, new_bar)
+
+        self._on_data_change()
+        if self._gantt:
+            self._gantt.set_data(self._app_data)
+
+    # ── Additional edit operations ────────────────────────────────────────────
+
+    def _add_maint_bar(self) -> None:
+        if self._app_data is None:
+            messagebox.showinfo("情報", "先にファイルを開いてください。", parent=self)
+            return
+        AddMaintenanceBarDialog(self, on_save=self._on_maint_added)
+
+    def _on_maint_added(self, bar: MaintenanceBar) -> None:
+        self._app_data.maintenance_bars.append(bar)
+        self._on_data_change()
+        if self._gantt:
+            self._gantt.redraw()
+
+    def _validate_now(self) -> None:
+        if self._app_data is None:
+            return
+        errors = validate(self._app_data)
+        if errors:
+            messagebox.showerror("検証結果 — エラーあり",
+                                 "\n".join(f"• {e}" for e in errors), parent=self)
+        else:
+            messagebox.showinfo("検証結果", "問題は見つかりませんでした。", parent=self)
+
+    def _open_settings(self) -> None:
+        if self._app_data is None:
+            return
+        SettingsDialog(self, self._app_data, on_save=self._on_settings_saved)
+
+    def _on_settings_saved(self, app_data: AppData) -> None:
+        self._app_data.engines = app_data.engines
+        self._on_data_change()
+        if self._gantt:
+            self._gantt.set_data(self._app_data)
+
+
+# ── Entry point ────────────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    app = GanttApp()
+    app.mainloop()

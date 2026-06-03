@@ -10,7 +10,8 @@ from tkinter import filedialog, messagebox
 import tkinter as tk
 from tkinter import ttk
 
-from models import AppData, MachineBar, MaintenanceBar, MACHINE_IDS, PERIOD_START, PERIOD_END
+from models import (AppData, MachineBar, MaintenanceBar,
+                    MACHINE_IDS, PERIOD_START, PERIOD_END, ENGINE_IDS)
 from data_io import load_json, save_json
 from validation import validate
 from gantt_canvas import GanttCanvas
@@ -19,6 +20,47 @@ from dialogs import (
     NewFileWizard, EditMachineBarDialog, EditMaintenanceBarDialog,
     AddMaintenanceBarDialog, InsertEngineDialog, SettingsDialog,
 )
+
+# ── 未搭載バー自動生成 ────────────────────────────────────────────────────────
+
+def _generate_maintenance_bars(app_data: AppData) -> list[MaintenanceBar]:
+    """機体バーから各タービンの空き期間を計算し未搭載バーリストを返す。"""
+    on_machine: dict[str, list[tuple[date, date]]] = {eid: [] for eid in ENGINE_IDS}
+    for b in app_data.machine_bars:
+        on_machine[b.engine_id].append((b.start, b.end))
+
+    def merge(ivs):
+        ivs = sorted(ivs)
+        merged: list[list] = []
+        for s, e in ivs:
+            if merged and s <= merged[-1][1] + timedelta(days=1):
+                merged[-1][1] = max(merged[-1][1], e)
+            else:
+                merged.append([s, e])
+        return merged
+
+    maint: list[MaintenanceBar] = []
+    for eid in ENGINE_IDS:
+        segs = merge(on_machine[eid]) if on_machine[eid] else []
+        free_start = PERIOD_START
+        for seg_s, seg_e in segs:
+            if free_start < seg_s:
+                maint.append(MaintenanceBar(
+                    engine_id=eid,
+                    start=free_start,
+                    end=seg_s - timedelta(days=1),
+                    status="6k点検",
+                ))
+            free_start = seg_e + timedelta(days=1)
+        if free_start <= PERIOD_END:
+            maint.append(MaintenanceBar(
+                engine_id=eid,
+                start=free_start,
+                end=PERIOD_END,
+                status="6k点検",
+            ))
+    return maint
+
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
@@ -101,7 +143,7 @@ class GanttApp(tk.Tk):
 
         settings_menu = tk.Menu(mb, tearoff=0)
         mb.add_cascade(label="設定", menu=settings_menu)
-        settings_menu.add_command(label="エンジン色の設定…", command=self._open_settings)
+        settings_menu.add_command(label="ガスタービン色の設定…", command=self._open_settings)
 
         self.bind_all("<Control-n>", lambda _: self._new_file())
         self.bind_all("<Control-o>", lambda _: self._open_file())
@@ -264,6 +306,43 @@ class GanttApp(tk.Tk):
             _save_prefs({"last_file": path})
             self._status_var.set(f"保存しました: {path}")
 
+    def _save_as_default(self) -> None:
+        """機体バーから未搭載バーを自動生成し、data/default.json に上書き保存する。"""
+        if self._app_data is None:
+            return
+        import copy
+        data = copy.deepcopy(self._app_data)
+
+        # 未搭載バーを機体バーから自動再計算
+        data.maintenance_bars = _generate_maintenance_bars(data)
+
+        # 重複チェック（警告のみ、保存は続行）
+        from validation import validate as _validate
+        errors = [e for e in _validate(data) if "重複" in e or "複数" in e]
+        if errors:
+            proceed = messagebox.askyesno(
+                "重複の警告",
+                "機体バーに以下の重複があります。\n\n" +
+                "\n".join(f"• {e}" for e in errors) +
+                "\n\nそのまま保存しますか？",
+                parent=self,
+            )
+            if not proceed:
+                return
+
+        target = str(DEFAULT_JSON)
+        save_json(data, target)
+        # アプリ内データにも未搭載バーを反映
+        self._app_data.maintenance_bars = data.maintenance_bars
+        if self._gantt:
+            self._gantt.set_data(self._app_data)
+        if self._summary:
+            self._summary.refresh()
+        self._status_var.set(f"デフォルトデータを更新しました: {target}")
+        messagebox.showinfo("保存完了",
+                            f"data/default.json を更新しました。\n未搭載バー {len(data.maintenance_bars)} 件を自動生成しました。",
+                            parent=self)
+
     def _confirm_discard(self) -> bool:
         if not self._modified:
             return True
@@ -390,5 +469,12 @@ class GanttApp(tk.Tk):
 # ── Entry point ────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    # Windows DPI awareness（高解像度ディスプレイ対応）
+    try:
+        from ctypes import windll
+        windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        pass
+
     app = GanttApp()
     app.mainloop()

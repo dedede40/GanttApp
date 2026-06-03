@@ -6,3 +6,4 @@ dist/
 *.spec.bak
 .gantt_prefs.json
 save/
+.DS_Store

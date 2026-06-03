@@ -3,7 +3,7 @@ name: Build Windows EXE
 on:
   push:
     branches: [main]
-  workflow_dispatch:   # 手動実行ボタンも有効化
+  workflow_dispatch:
 
 jobs:
   build:
@@ -24,13 +24,20 @@ jobs:
       - name: EXE をビルド
         run: pyinstaller GanttApp.spec --clean --noconfirm
 
-      - name: save フォルダを追加
-        run: New-Item -ItemType Directory -Force -Path dist\GanttApp\save
+      - name: 配布フォルダを整える
         shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\GanttApp\save
+          Copy-Item -Path "README_配布用.txt" -Destination "dist\GanttApp\" -ErrorAction SilentlyContinue
 
-      - name: ビルド成果物をアップロード
+      - name: ZIP に圧縮
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist\GanttApp\* -DestinationPath GanttApp_v1.zip
+
+      - name: ZIP をアップロード
         uses: actions/upload-artifact@v4
         with:
-          name: GanttApp-Windows
-          path: dist\GanttApp\
-          retention-days: 30
+          name: GanttApp_v1
+          path: GanttApp_v1.zip
+          retention-days: 90

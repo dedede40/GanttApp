@@ -10,29 +10,30 @@ from models import (
     MACHINE_IDS, MACHINE_NAMES,
     PERIOD_START, PERIOD_END, SEG1_START, SEG1_END, SEG2_START, SEG2_END,
     days_in_month, add_months, fmt_date, months_between, round_half_month,
-    engine_by_id,
+    engine_by_id, hex_lighten,
 )
 from tooltip import Tooltip
 
 # ── Layout constants ──────────────────────────────────────────────────────────
 
-LABEL_W  = 120   # width of left label column
-MONTH_W  = 30    # pixels per month
-YEAR_H   = 24    # height of year header row
-MONTH_H  = 22    # height of month header row
-HEADER_H = YEAR_H + MONTH_H   # 46
-ROW_H    = 48    # height of each machine/maintenance row
-SEP_H    = 16    # separator between machine rows and maintenance row
-SEG_GAP  = 32    # vertical gap between segment 1 and segment 2
+LABEL_W      = 80    # width of left label column
+MONTH_W      = 23    # pixels per month
+YEAR_H       = 20    # height of year header row
+MONTH_H      = 18    # height of month header row
+HEADER_H     = YEAR_H + MONTH_H   # 38
+ROW_H        = 36    # height of each machine row
+MAINT_ROW_H  = 58    # height of maintenance row (2-line text)
+SEP_H        = 10    # separator between machine rows and maintenance row
+SEG_GAP      = 20    # vertical gap between segment 1 and segment 2
 
-BAR_PAD  = 6     # vertical padding inside row for bar
-EDGE_TOL = 6     # pixels from edge to trigger resize cursor
+BAR_PAD  = 4     # vertical padding inside row for bar
+EDGE_TOL = 5     # pixels from edge to trigger resize cursor
 
-SEG_H = HEADER_H + 3 * ROW_H + SEP_H + ROW_H
-# = 46 + 144 + 16 + 48 = 254
+SEG_H = HEADER_H + 3 * ROW_H + SEP_H + MAINT_ROW_H
 
-CANVAS_W = LABEL_W + 60 * MONTH_W           # 120 + 1800 = 1920
-CANVAS_H = 2 * SEG_H + SEG_GAP              # 508 + 32 = 540
+SEG_MONTHS = 48                              # 4年×12ヶ月
+CANVAS_W = LABEL_W + SEG_MONTHS * MONTH_W
+CANVAS_H = 2 * SEG_H + SEG_GAP
 
 MONTHS_SHORT = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]
 
@@ -49,10 +50,18 @@ def _machine_row_y(seg: int, row: int) -> int:
 def _maint_row_y(seg: int) -> int:
     return _seg_y(seg) + HEADER_H + 3 * ROW_H + SEP_H
 
+def _maint_row_h() -> int:
+    return MAINT_ROW_H
+
+
+def _seg_ref(seg: int) -> date:
+    """First day of segment (seg=0→2026-01, seg=1→2030-01)."""
+    return date(2026 + seg * 4, 1, 1)
+
 
 def _date_to_x(d: date, seg: int) -> float:
     """Left-edge x for a date within a segment."""
-    ref = date(2025 + seg * 5, 1, 1)
+    ref = _seg_ref(seg)
     months = (d.year - ref.year) * 12 + (d.month - ref.month)
     frac   = (d.day - 1) / days_in_month(d.year, d.month)
     return LABEL_W + (months + frac) * MONTH_W
@@ -60,7 +69,7 @@ def _date_to_x(d: date, seg: int) -> float:
 
 def _date_to_x2(d: date, seg: int) -> float:
     """Right-edge x for a date within a segment."""
-    ref = date(2025 + seg * 5, 1, 1)
+    ref = _seg_ref(seg)
     months = (d.year - ref.year) * 12 + (d.month - ref.month)
     frac   = d.day / days_in_month(d.year, d.month)
     return LABEL_W + (months + frac) * MONTH_W
@@ -68,12 +77,12 @@ def _date_to_x2(d: date, seg: int) -> float:
 
 def _x_to_date(x: float, seg: int) -> date:
     """Convert canvas x to date within segment seg, snapped to day."""
-    ref  = date(2025 + seg * 5, 1, 1)
+    ref  = _seg_ref(seg)
     frac = max(0.0, (x - LABEL_W) / MONTH_W)
-    frac = min(frac, 60.0 - 1e-9)
-    mi   = int(frac)          # whole months
-    df   = frac - mi           # day fraction
-    year  = ref.year  + mi // 12
+    frac = min(frac, SEG_MONTHS - 1e-9)
+    mi   = int(frac)
+    df   = frac - mi
+    year  = ref.year + mi // 12
     month = (ref.month - 1 + mi % 12) % 12 + 1
     year += (ref.month - 1 + mi % 12) // 12
     dim  = days_in_month(year, month)
@@ -172,100 +181,102 @@ class GanttCanvas(tk.Frame):
 
     def _draw_background(self) -> None:
         c = self._canvas
+        BK = "white"
+        FG = "black"
+        GRID = "#888888"
+        HEAD_BG = "#DDDDDD"
 
         for seg in range(2):
             sy  = _seg_y(seg)
             ref = date(2025 + seg * 5, 1, 1)
 
-            # Background rect
-            c.create_rectangle(
-                0, sy, CANVAS_W, sy + SEG_H,
-                fill="#F7F7F7", outline="",
-            )
+            # Whole segment background (white)
+            c.create_rectangle(0, sy, CANVAS_W, sy + SEG_H,
+                               fill=BK, outline="")
 
-            # Alternating row shading for machine rows
-            for row in range(3):
-                ry = _machine_row_y(seg, row)
-                shade = "#FFFFFF" if row % 2 == 0 else "#F0F4FA"
-                c.create_rectangle(LABEL_W, ry, CANVAS_W, ry + ROW_H,
-                                   fill=shade, outline="")
+            ref    = _seg_ref(seg)
 
-            # Maintenance row
-            my = _maint_row_y(seg)
-            c.create_rectangle(LABEL_W, my, CANVAS_W, my + ROW_H,
-                               fill="#F5F0FB", outline="")
-
-            # Year header bands + labels
+            # ── Year header row ──────────────────────────────────────────
             year_y = sy
             col_y  = sy + YEAR_H
-            prev_x = LABEL_W
-            for mi in range(60):
-                m   = add_months(ref, mi)
-                x1  = LABEL_W + mi * MONTH_W
-                x2  = x1 + MONTH_W
+            for mi in range(SEG_MONTHS):
+                m  = add_months(ref, mi)
+                x1 = LABEL_W + mi * MONTH_W
 
-                # Month divider line (light)
-                c.create_line(x1, sy, x1, sy + SEG_H, fill="#D0D0D0")
-
-                # Year change → draw year label
                 if mi == 0 or m.month == 1:
-                    # Year header rectangle
-                    # find how many months this year spans in segment
                     yr = m.year
-                    yr_start_mi = mi
-                    yr_end_mi   = min(59, yr_start_mi + (12 - m.month))
-                    yr_x1 = LABEL_W + yr_start_mi * MONTH_W
+                    yr_end_mi = min(SEG_MONTHS - 1, mi + 11)
+                    yr_x1 = LABEL_W + mi * MONTH_W
                     yr_x2 = LABEL_W + (yr_end_mi + 1) * MONTH_W
-                    fill  = "#3B6EA5" if yr % 2 == 0 else "#2E5C8A"
                     c.create_rectangle(yr_x1, year_y, yr_x2, year_y + YEAR_H,
-                                       fill=fill, outline="")
+                                       fill=HEAD_BG, outline=FG)
                     c.create_text(
                         (yr_x1 + yr_x2) / 2, year_y + YEAR_H / 2,
-                        text=f"{yr}年", fill="white",
+                        text=f"{yr}年", fill=FG,
                         font=("Meiryo UI", 9, "bold"), anchor="center",
                     )
-                    prev_x = yr_x2
 
-                # Month label
+            # ── Month header row ─────────────────────────────────────────
+            for mi in range(SEG_MONTHS):
+                m  = add_months(ref, mi)
+                x1 = LABEL_W + mi * MONTH_W
+                x2 = x1 + MONTH_W
                 c.create_rectangle(x1, col_y, x2, col_y + MONTH_H,
-                                   fill="#EEF2F8", outline="#D0D0D0")
+                                   fill=HEAD_BG, outline=FG)
                 c.create_text(
                     x1 + MONTH_W / 2, col_y + MONTH_H / 2,
-                    text=MONTHS_SHORT[m.month - 1], fill="#333",
-                    font=("Meiryo UI", 8), anchor="center",
+                    text=MONTHS_SHORT[m.month - 1], fill=FG,
+                    font=("Meiryo UI", 7), anchor="center",
                 )
 
-            # Horizontal grid lines
-            for row in range(4):
-                ry = _machine_row_y(seg, row) if row < 3 else _maint_row_y(seg)
-                c.create_line(LABEL_W, ry, CANVAS_W, ry, fill="#C0C8D8")
-            c.create_line(LABEL_W, sy + SEG_H, CANVAS_W, sy + SEG_H, fill="#C0C8D8")
+            # ── Vertical month grid lines across rows ────────────────────
+            row_top = _seg_y(seg) + HEADER_H
+            row_bot = _maint_row_y(seg) + ROW_H
+            for mi in range(SEG_MONTHS + 1):
+                x = LABEL_W + mi * MONTH_W
+                c.create_line(x, row_top, x, row_bot, fill=GRID)
 
-            # Separator line between machines and maintenance
-            sep_y = _seg_y(seg) + HEADER_H + 3 * ROW_H
-            c.create_line(0, sep_y, CANVAS_W, sep_y + SEP_H // 2,
-                          fill="#B0B0B0", width=1, dash=(4, 2))
+            # ── Horizontal row lines ─────────────────────────────────────
+            for row in range(3):
+                ry = _machine_row_y(seg, row)
+                c.create_line(0, ry, CANVAS_W, ry, fill=FG)
+            # line after machine 3
+            sep_top = _seg_y(seg) + HEADER_H + 3 * ROW_H
+            c.create_line(0, sep_top, CANVAS_W, sep_top, fill=FG)
+            # line at top of maint row
+            my = _maint_row_y(seg)
+            c.create_line(0, my, CANVAS_W, my, fill=FG)
+            # line at bottom of maint row (uses MAINT_ROW_H)
+            c.create_line(0, my + MAINT_ROW_H, CANVAS_W, my + MAINT_ROW_H, fill=FG)
 
-            # Left label column background
+            # ── Left label column ────────────────────────────────────────
             c.create_rectangle(0, sy, LABEL_W, sy + SEG_H,
-                               fill="#E8EDF5", outline="")
-            c.create_line(LABEL_W, sy, LABEL_W, sy + SEG_H,
-                          fill="#A0A8B8", width=1)
+                               fill=HEAD_BG, outline="")
+            c.create_line(LABEL_W, sy, LABEL_W, sy + SEG_H, fill=FG, width=2)
 
-            # Row labels
             for row, mid in enumerate(MACHINE_IDS):
                 ry = _machine_row_y(seg, row)
                 c.create_text(
                     LABEL_W // 2, ry + ROW_H // 2,
-                    text=MACHINE_NAMES[mid], fill="#222",
-                    font=("Meiryo UI", 10, "bold"), anchor="center",
+                    text=MACHINE_NAMES[mid], fill=FG,
+                    font=("Meiryo UI", 9, "bold"), anchor="center",
                 )
 
-            my = _maint_row_y(seg)
             c.create_text(
-                LABEL_W // 2, my + ROW_H // 2,
-                text="未搭載", fill="#555",
+                LABEL_W // 2, my + MAINT_ROW_H // 2,
+                text="未搭載", fill=FG,
                 font=("Meiryo UI", 9), anchor="center",
+            )
+
+            # ── Segment label (年代) at top-left ─────────────────────────
+            yr_start = 2026 + seg * 4
+            yr_end   = yr_start + 3
+            c.create_rectangle(0, year_y, LABEL_W, year_y + YEAR_H,
+                               fill=HEAD_BG, outline=FG)
+            c.create_text(
+                LABEL_W // 2, year_y + YEAR_H / 2,
+                text=f"{yr_start}〜{yr_end}", fill=FG,
+                font=("Meiryo UI", 7, "bold"), anchor="center",
             )
 
     def _engine_color(self, eid: str) -> str:
@@ -299,20 +310,30 @@ class GanttCanvas(tk.Frame):
 
         color = self._engine_color(b.engine_id)
         rid   = self._canvas.create_rectangle(
-            x1, y1, x2, y2, fill=color, outline="white", width=1.5,
+            x1, y1, x2, y2, fill=color, outline="black", width=1,
         )
         label = f"{b.engine_id} / {int(b.operation_rate * 100)}%"
         tid = 0
-        if x2 - x1 > 70:
+        if x2 - x1 > 50:
             tid = self._canvas.create_text(
                 (x1 + x2) / 2, (y1 + y2) / 2,
-                text=label, fill="white",
-                font=("Meiryo UI", 9, "bold"), anchor="center",
+                text=label, fill="black",
+                font=("Meiryo UI", 8, "bold"), anchor="center",
             )
 
         self._bars.append(BarRecord(kind, idx, seg, row, x1, y1, x2, y2, rid, tid))
 
+    # 未搭載バーの表示対象外とする期間
+    _MAINT_HIDE_BEFORE = date(2028, 5, 1)   # 2028年4月末まで → 非表示
+    _MAINT_HIDE_FROM   = date(2033, 1, 1)   # 2033年以降 → 非表示
+
     def _draw_one_maint_bar(self, b: MaintenanceBar, kind: str, idx: int, seg: int) -> None:
+        # 表示フィルタ：2028年4月末までに終わるもの、2033年以降に始まるものは非表示
+        if b.end < self._MAINT_HIDE_BEFORE:
+            return
+        if b.start >= self._MAINT_HIDE_FROM:
+            return
+
         seg_lo = SEG1_START if seg == 0 else SEG2_START
         seg_hi = SEG1_END   if seg == 0 else SEG2_END
 
@@ -325,24 +346,33 @@ class GanttCanvas(tk.Frame):
         x1 = _date_to_x(cs,  seg)
         x2 = _date_to_x2(ce, seg)
         y1 = my + BAR_PAD
-        y2 = my + ROW_H - BAR_PAD
+        y2 = my + MAINT_ROW_H - BAR_PAD
+        cx = (x1 + x2) / 2
+        cy = (y1 + y2) / 2
 
-        color = self._engine_color(b.engine_id)
-        rid   = self._canvas.create_rectangle(
-            x1, y1, x2, y2, fill=color, outline="white", width=1.5,
-            stipple="gray50",   # maintenance bars shown with pattern
+        color = hex_lighten(self._engine_color(b.engine_id), 0.68)
+        rid = self._canvas.create_rectangle(
+            x1, y1, x2, y2, fill=color, outline="black", width=1,
         )
-        # stipple makes text hard to see; draw on top without stipple
-        rid2 = self._canvas.create_rectangle(
-            x1, y1, x2, y2, fill="", outline="white", width=1.5,
-        )
-        label = f"{b.engine_id}:{b.status}"
+
+        bar_w = x2 - x1
         tid = 0
-        if x2 - x1 > 80:
+        if bar_w > 30:
+            # 1行目：GT名 ＋ 0.5ヶ月単位の期間
+            duration = round_half_month(months_between(b.start, b.end))
+            line1 = f"{b.engine_id}  {duration}" if bar_w > 70 else b.engine_id
+            # 2行目：点検種別
+            line2 = b.status
+
+            self._canvas.create_text(
+                cx, cy - 8,
+                text=line1, fill="black",
+                font=("Meiryo UI", 8, "bold"), anchor="center",
+            )
             tid = self._canvas.create_text(
-                (x1 + x2) / 2, (y1 + y2) / 2,
-                text=label, fill="white",
-                font=("Meiryo UI", 9), anchor="center",
+                cx, cy + 8,
+                text=line2, fill="black",
+                font=("Meiryo UI", 8), anchor="center",
             )
 
         self._bars.append(BarRecord(kind, idx, seg, -1, x1, y1, x2, y2, rid, tid))
@@ -508,9 +538,12 @@ class GanttCanvas(tk.Frame):
             menu.add_separator()
             seg_date = _x_to_date(cx, br.seg)
             menu.add_command(
-                label=f"ここでエンジン交換 ({seg_date.strftime('%Y/%m/%d')})",
+                label=f"ここでガスタービン交換 ({seg_date.strftime('%Y/%m/%d')})",
                 command=lambda d=seg_date, b=br: self._open_edit("insert", b.idx, d),
             )
+        elif br.kind == "maint":
+            menu.add_separator()
+            menu.add_command(label="削除", command=lambda b=br: self._delete_maint_bar(b.idx))
         menu.tk_popup(event.x_root, event.y_root)
 
     def _pos_to_row(self, cx: float, cy: float) -> Tuple[int, int]:
@@ -523,6 +556,11 @@ class GanttCanvas(tk.Frame):
                     return seg, row
         return -1, -1
 
+    def _delete_maint_bar(self, idx: int) -> None:
+        del self.app_data.maintenance_bars[idx]
+        self.redraw()
+        self.on_change()
+
     def _show_machine_row_menu(self, event, mid: str, cx: float, seg: int) -> None:
         seg_date = _x_to_date(cx, seg)
         menu = tk.Menu(self, tearoff=0)
@@ -532,7 +570,7 @@ class GanttCanvas(tk.Frame):
             last = max(bars, key=lambda b: b.start)
             idx  = self.app_data.machine_bars.index(last)
             menu.add_command(
-                label=f"エンジン交換を挿入 ({seg_date.strftime('%Y/%m/%d')})",
+                label=f"ガスタービン交換を挿入 ({seg_date.strftime('%Y/%m/%d')})",
                 command=lambda d=seg_date, i=idx: self._open_edit("insert", i, d),
             )
         menu.tk_popup(event.x_root, event.y_root)
@@ -546,14 +584,18 @@ class GanttCanvas(tk.Frame):
             return
         mode = self._hit_mode(br, cx)
         self._canvas.config(cursor="sb_h_double_arrow" if mode != "move" else "fleur")
-        self._tooltip.show(self._bar_tooltip(br), event.x, event.y)
+        if br.kind == "machine":
+            color = self._engine_color(self.app_data.machine_bars[br.idx].engine_id)
+        else:
+            color = self._engine_color(self.app_data.maintenance_bars[br.idx].engine_id)
+        self._tooltip.show(self._bar_tooltip(br), event.x, event.y, bar_color=color)
 
     def _bar_tooltip(self, br: BarRecord) -> str:
         if br.kind == "machine":
             b = self.app_data.machine_bars[br.idx]
             duration = round_half_month(months_between(b.start, b.end))
             return (
-                f"エンジン: {b.engine_id}\n"
+                f"ガスタービン: {b.engine_id}\n"
                 f"開始日: {fmt_date(b.start)}\n"
                 f"終了日: {fmt_date(b.end)}\n"
                 f"稼働率: {int(b.operation_rate * 100)}%\n"
@@ -565,7 +607,7 @@ class GanttCanvas(tk.Frame):
             b = self.app_data.maintenance_bars[br.idx]
             duration = round_half_month(months_between(b.start, b.end))
             return (
-                f"エンジン: {b.engine_id}\n"
+                f"ガスタービン: {b.engine_id}\n"
                 f"開始日: {fmt_date(b.start)}\n"
                 f"終了日: {fmt_date(b.end)}\n"
                 f"状態: {b.status}\n"

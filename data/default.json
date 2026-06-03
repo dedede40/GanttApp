@@ -1,24 +1,388 @@
 {
   "engines": [
-    { "id": "1868", "color": "#4A90D9", "initial_hours": 12000 },
-    { "id": "2445", "color": "#E8852A", "initial_hours":  8000 },
-    { "id": "2446", "color": "#2EAA60", "initial_hours":  5000 },
-    { "id": "2450", "color": "#9B5BB5", "initial_hours":  3000 }
+    {
+      "id": "1868",
+      "color": "#FFBB77",
+      "initial_hours": 12000.0
+    },
+    {
+      "id": "2445",
+      "color": "#FFB6C1",
+      "initial_hours": 8000.0
+    },
+    {
+      "id": "2446",
+      "color": "#87CEEB",
+      "initial_hours": 5000.0
+    },
+    {
+      "id": "2450",
+      "color": "#FFD700",
+      "initial_hours": 3000.0
+    }
   ],
   "machines": [
-    { "id": "1", "name": "1号機" },
-    { "id": "2", "name": "2号機" },
-    { "id": "3", "name": "3号機" }
+    {
+      "id": "1",
+      "name": "1号機"
+    },
+    {
+      "id": "2",
+      "name": "2号機"
+    },
+    {
+      "id": "3",
+      "name": "3号機"
+    }
   ],
   "schedule": {
     "machine_bars": [
-      { "machine_id": "1", "engine_id": "1868", "start": "20250101", "end": "20261231", "operation_rate": 0.80 },
-      { "machine_id": "1", "engine_id": "2445", "start": "20270101", "end": "20341231", "operation_rate": 0.80 },
-      { "machine_id": "2", "engine_id": "2446", "start": "20250101", "end": "20341231", "operation_rate": 0.75 },
-      { "machine_id": "3", "engine_id": "2450", "start": "20250101", "end": "20341231", "operation_rate": 0.80 }
+      {
+        "machine_id": "1",
+        "engine_id": "1868",
+        "start": "20260101",
+        "end": "20261001",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "1",
+        "engine_id": "2446",
+        "start": "20261002",
+        "end": "20270813",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "1",
+        "engine_id": "2445",
+        "start": "20270814",
+        "end": "20280501",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "1",
+        "engine_id": "1868",
+        "start": "20280502",
+        "end": "20290302",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "1",
+        "engine_id": "2446",
+        "start": "20290303",
+        "end": "20291031",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "1",
+        "engine_id": "2445",
+        "start": "20291101",
+        "end": "20300830",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "1",
+        "engine_id": "1868",
+        "start": "20300831",
+        "end": "20310628",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "1",
+        "engine_id": "2450",
+        "start": "20310629",
+        "end": "20320531",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "1",
+        "engine_id": "2446",
+        "start": "20320601",
+        "end": "20330329",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "2",
+        "engine_id": "2445",
+        "start": "20260101",
+        "end": "20260401",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "2",
+        "engine_id": "2450",
+        "start": "20260402",
+        "end": "20270201",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "2",
+        "engine_id": "1868",
+        "start": "20270202",
+        "end": "20280203",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "2",
+        "engine_id": "2446",
+        "start": "20280204",
+        "end": "20281218",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "2",
+        "engine_id": "2450",
+        "start": "20281219",
+        "end": "20291202",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "2",
+        "engine_id": "2446",
+        "start": "20291203",
+        "end": "20301201",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "2",
+        "engine_id": "2445",
+        "start": "20301202",
+        "end": "20310928",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "2",
+        "engine_id": "1868",
+        "start": "20310929",
+        "end": "20320731",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "2",
+        "engine_id": "2450",
+        "start": "20320801",
+        "end": "20330329",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "3",
+        "engine_id": "2446",
+        "start": "20260101",
+        "end": "20260628",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "3",
+        "engine_id": "2445",
+        "start": "20260629",
+        "end": "20270529",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "3",
+        "engine_id": "2450",
+        "start": "20270530",
+        "end": "20280601",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "3",
+        "engine_id": "2445",
+        "start": "20280602",
+        "end": "20290607",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "3",
+        "engine_id": "1868",
+        "start": "20290608",
+        "end": "20300620",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "3",
+        "engine_id": "2450",
+        "start": "20300621",
+        "end": "20310504",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "3",
+        "engine_id": "2446",
+        "start": "20310505",
+        "end": "20320426",
+        "operation_rate": 0.8
+      },
+      {
+        "machine_id": "3",
+        "engine_id": "2445",
+        "start": "20320427",
+        "end": "20330401",
+        "operation_rate": 0.8
+      }
     ],
     "maintenance_bars": [
-      { "engine_id": "2445", "start": "20250101", "end": "20261231", "status": "12k点検" }
+      {
+        "engine_id": "1868",
+        "start": "20261002",
+        "end": "20270201",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "1868",
+        "start": "20280204",
+        "end": "20280501",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "1868",
+        "start": "20290303",
+        "end": "20290607",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "1868",
+        "start": "20300621",
+        "end": "20300830",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "1868",
+        "start": "20310629",
+        "end": "20310928",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "1868",
+        "start": "20320801",
+        "end": "20331231",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "2445",
+        "start": "20260402",
+        "end": "20260628",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "2445",
+        "start": "20270530",
+        "end": "20270813",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "2445",
+        "start": "20280502",
+        "end": "20280601",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "2445",
+        "start": "20290608",
+        "end": "20291031",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "2445",
+        "start": "20300831",
+        "end": "20301201",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "2445",
+        "start": "20310929",
+        "end": "20320426",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "2445",
+        "start": "20330402",
+        "end": "20331231",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "2446",
+        "start": "20260629",
+        "end": "20261001",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "2446",
+        "start": "20270814",
+        "end": "20280203",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "2446",
+        "start": "20281219",
+        "end": "20290302",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "2446",
+        "start": "20291101",
+        "end": "20291202",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "2446",
+        "start": "20301202",
+        "end": "20310504",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "2446",
+        "start": "20320427",
+        "end": "20320531",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "2446",
+        "start": "20330330",
+        "end": "20331231",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "2450",
+        "start": "20260101",
+        "end": "20260401",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "2450",
+        "start": "20270202",
+        "end": "20270529",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "2450",
+        "start": "20280602",
+        "end": "20281218",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "2450",
+        "start": "20291203",
+        "end": "20300620",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "2450",
+        "start": "20310505",
+        "end": "20310628",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "2450",
+        "start": "20320601",
+        "end": "20320731",
+        "status": "6k点検"
+      },
+      {
+        "engine_id": "2450",
+        "start": "20330330",
+        "end": "20331231",
+        "status": "6k点検"
+      }
     ]
   }
 }

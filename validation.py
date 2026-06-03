@@ -49,7 +49,7 @@ def validate(app_data: AppData) -> List[str]:
                 continue
             if b1.start <= b2.end and b2.start <= b1.end:
                 errors.append(
-                    f"エンジン {b1.engine_id}: 同時に複数本体に配置されています"
+                    f"ガスタービン {b1.engine_id}: 同時に複数本体に配置されています"
                 )
 
     # No engine on machine and in maintenance at same time
@@ -59,7 +59,7 @@ def validate(app_data: AppData) -> List[str]:
                 continue
             if mb.start <= mn.end and mn.start <= mb.end:
                 errors.append(
-                    f"エンジン {mb.engine_id}: 本体バーと別枠バーが期間重複しています"
+                    f"ガスタービン {mb.engine_id}: 本体バーと別枠バーが期間重複しています"
                 )
 
     return errors

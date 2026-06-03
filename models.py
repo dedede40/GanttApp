@@ -11,12 +11,12 @@ MACHINE_IDS  = ["1", "2", "3"]
 MACHINE_NAMES = {"1": "1号機", "2": "2号機", "3": "3号機"}
 MAINTENANCE_STATUSES = ["6k点検", "12k点検", "96kOH"]
 
-PERIOD_START = date(2025, 1, 1)
-PERIOD_END   = date(2034, 12, 31)
-SEG1_START   = date(2025, 1, 1)
+PERIOD_START = date(2026, 1, 1)
+PERIOD_END   = date(2033, 12, 31)
+SEG1_START   = date(2026, 1, 1)
 SEG1_END     = date(2029, 12, 31)
 SEG2_START   = date(2030, 1, 1)
-SEG2_END     = date(2034, 12, 31)
+SEG2_END     = date(2033, 12, 31)
 
 DEFAULT_COLORS = {
     "1868": "#4A90D9",
@@ -101,6 +101,20 @@ def parse_date8(s: str) -> date:
 
 def dump_date8(d: date) -> str:
     return d.strftime("%Y%m%d")
+
+
+def hex_lighten(hex_color: str, factor: float = 0.75) -> str:
+    """Blend hex_color toward white by factor (0=original, 1=white)."""
+    try:
+        r = int(hex_color[1:3], 16)
+        g = int(hex_color[3:5], 16)
+        b = int(hex_color[5:7], 16)
+        r = int(r + (255 - r) * factor)
+        g = int(g + (255 - g) * factor)
+        b = int(b + (255 - b) * factor)
+        return f"#{r:02X}{g:02X}{b:02X}"
+    except Exception:
+        return "#FFFFFF"
 
 
 def engine_by_id(app_data: AppData, eid: str) -> Optional[Engine]:

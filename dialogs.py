@@ -111,13 +111,13 @@ class NewFileWizard(tk.Toplevel):
         tk.Label(self._outer, text="Step 1 / 3  ―  初期稼働時間の設定",
                  font=("Meiryo UI", 11, "bold")).pack(anchor="w", pady=(0, 10))
         tk.Label(self._outer,
-                 text="2025年1月時点の各エンジン累積稼働時間 (h) を入力してください。"
+                 text="2025年1月時点の各ガスタービン累積稼働時間 (h) を入力してください。"
                  ).pack(anchor="w", pady=(0, 8))
 
         frame = tk.Frame(self._outer)
         frame.pack(anchor="w")
         for i, eid in enumerate(ENGINE_IDS):
-            tk.Label(frame, text=f"エンジン {eid}:", width=14, anchor="e"
+            tk.Label(frame, text=f"ガスタービン {eid}:", width=14, anchor="e"
                      ).grid(row=i, column=0, padx=6, pady=4)
             var = tk.StringVar(value="0")
             self._init_hours[eid] = var
@@ -134,7 +134,7 @@ class NewFileWizard(tk.Toplevel):
         tk.Label(self._outer, text="Step 2 / 3  ―  初期配置の設定",
                  font=("Meiryo UI", 11, "bold")).pack(anchor="w", pady=(0, 10))
         tk.Label(self._outer,
-                 text="2025年1月1日時点で各本体に搭載するエンジンを選択してください。"
+                 text="2025年1月1日時点で各本体に搭載するガスタービンを選択してください。"
                  ).pack(anchor="w", pady=(0, 8))
 
         frame = tk.Frame(self._outer)
@@ -163,7 +163,7 @@ class NewFileWizard(tk.Toplevel):
         frame.pack(anchor="w")
         row = 0
         for eid in ENGINE_IDS:
-            tk.Label(frame, text=f"エンジン {eid} 初期時間:"
+            tk.Label(frame, text=f"ガスタービン {eid} 初期時間:"
                      ).grid(row=row, column=0, sticky="e", padx=6, pady=2)
             tk.Label(frame, text=f"{self._init_hours[eid].get()} h"
                      ).grid(row=row, column=1, sticky="w", padx=6)
@@ -172,7 +172,7 @@ class NewFileWizard(tk.Toplevel):
             eid = self._initial_engines[mid].get()
             tk.Label(frame, text=f"{MACHINE_NAMES[mid]}:"
                      ).grid(row=row, column=0, sticky="e", padx=6, pady=2)
-            tk.Label(frame, text=f"エンジン {eid}"
+            tk.Label(frame, text=f"ガスタービン {eid}"
                      ).grid(row=row, column=1, sticky="w", padx=6)
             row += 1
 
@@ -211,7 +211,7 @@ class NewFileWizard(tk.Toplevel):
                     raise ValueError
             except ValueError:
                 messagebox.showerror("入力エラー",
-                                     f"エンジン {eid} の稼働時間が不正です。", parent=self)
+                                     f"ガスタービン {eid} の稼働時間が不正です。", parent=self)
                 return False
         return True
 
@@ -219,7 +219,7 @@ class NewFileWizard(tk.Toplevel):
         chosen = [cb.get() for cb in self._initial_engines.values()]
         if len(set(chosen)) != len(chosen):
             messagebox.showerror("入力エラー",
-                                 "各本体に異なるエンジンを割り当ててください。", parent=self)
+                                 "各本体に異なるガスタービンを割り当ててください。", parent=self)
             return False
         return True
 
@@ -251,7 +251,7 @@ class EditMachineBarDialog(tk.Toplevel):
     def __init__(self, parent: tk.Widget, bar: MachineBar,
                  on_save: Callable[[MachineBar], None]):
         super().__init__(parent)
-        self.title(f"本体バー編集 — エンジン {bar.engine_id}")
+        self.title(f"本体バー編集 — ガスタービン {bar.engine_id}")
         self.resizable(False, False)
         self.grab_set()
         self._bar    = bar
@@ -260,7 +260,7 @@ class EditMachineBarDialog(tk.Toplevel):
         frame = tk.LabelFrame(self, text="バー情報", padx=10, pady=10)
         frame.pack(padx=16, pady=12, fill="both")
 
-        tk.Label(frame, text="エンジン:", anchor="e"
+        tk.Label(frame, text="ガスタービン:", anchor="e"
                  ).grid(row=0, column=0, sticky="e", padx=6, pady=4)
         tk.Label(frame, text=bar.engine_id, anchor="w"
                  ).grid(row=0, column=1, sticky="w", padx=6)
@@ -310,7 +310,7 @@ class EditMaintenanceBarDialog(tk.Toplevel):
     def __init__(self, parent: tk.Widget, bar: MaintenanceBar,
                  on_save: Callable[[MaintenanceBar], None]):
         super().__init__(parent)
-        self.title(f"別枠バー編集 — エンジン {bar.engine_id}")
+        self.title(f"別枠バー編集 — ガスタービン {bar.engine_id}")
         self.resizable(False, False)
         self.grab_set()
         self._bar     = bar
@@ -319,7 +319,7 @@ class EditMaintenanceBarDialog(tk.Toplevel):
         frame = tk.LabelFrame(self, text="バー情報", padx=10, pady=10)
         frame.pack(padx=16, pady=12, fill="both")
 
-        tk.Label(frame, text="エンジン:", anchor="e"
+        tk.Label(frame, text="ガスタービン:", anchor="e"
                  ).grid(row=0, column=0, sticky="e", padx=6, pady=4)
         tk.Label(frame, text=bar.engine_id, anchor="w"
                  ).grid(row=0, column=1, sticky="w", padx=6)
@@ -371,7 +371,7 @@ class AddMaintenanceBarDialog(tk.Toplevel):
         frame = tk.LabelFrame(self, text="新規別枠バー", padx=10, pady=10)
         frame.pack(padx=16, pady=12, fill="both")
 
-        self._engine = _label_combo(frame, "エンジン:", 0, ENGINE_IDS, ENGINE_IDS[0])
+        self._engine = _label_combo(frame, "ガスタービン:", 0, ENGINE_IDS, ENGINE_IDS[0])
         self._start  = _label_date(frame, "開始日:", 1, PERIOD_START)
         self._end    = _label_date(frame, "終了日:", 2, date(2025, 3, 31))
         self._status = _label_combo(frame, "状態:", 3, MAINTENANCE_STATUSES,
@@ -413,7 +413,7 @@ class InsertEngineDialog(tk.Toplevel):
                  bar_idx: int, split_date: date,
                  on_save: Callable[[int, date, str], None]):
         super().__init__(parent)
-        self.title("エンジン交換")
+        self.title("ガスタービン交換")
         self.resizable(False, False)
         self.grab_set()
         self._on_save = on_save
@@ -421,7 +421,7 @@ class InsertEngineDialog(tk.Toplevel):
 
         bar = app_data.machine_bars[bar_idx]
 
-        frame = tk.LabelFrame(self, text="エンジン交換設定", padx=10, pady=10)
+        frame = tk.LabelFrame(self, text="ガスタービン交換設定", padx=10, pady=10)
         frame.pack(padx=16, pady=12, fill="both")
 
         tk.Label(frame, text="本体:", anchor="e"
@@ -429,7 +429,7 @@ class InsertEngineDialog(tk.Toplevel):
         tk.Label(frame, text=MACHINE_NAMES[bar.machine_id], anchor="w"
                  ).grid(row=0, column=1, sticky="w", padx=6)
 
-        tk.Label(frame, text="現在のエンジン:", anchor="e"
+        tk.Label(frame, text="現在のガスタービン:", anchor="e"
                  ).grid(row=1, column=0, sticky="e", padx=6, pady=4)
         tk.Label(frame, text=bar.engine_id, anchor="w"
                  ).grid(row=1, column=1, sticky="w", padx=6)
@@ -439,11 +439,11 @@ class InsertEngineDialog(tk.Toplevel):
 
         # Available engines: not on any machine at the exchange period
         avail = self._available_engines(app_data, bar)
-        self._new_engine = _label_combo(frame, "新エンジン:", 3, avail,
+        self._new_engine = _label_combo(frame, "新ガスタービン:", 3, avail,
                                         avail[0] if avail else "")
 
         if not avail:
-            tk.Label(frame, text="⚠ 使用可能なエンジンがありません",
+            tk.Label(frame, text="⚠ 使用可能なガスタービンがありません",
                      fg="red").grid(row=4, column=0, columnspan=2, pady=4)
 
         btn_frame = tk.Frame(self)
@@ -471,7 +471,7 @@ class InsertEngineDialog(tk.Toplevel):
         split = self._split_date.get()
         new_e = self._new_engine.get()
         if not new_e:
-            messagebox.showerror("エラー", "エンジンを選択してください。", parent=self)
+            messagebox.showerror("エラー", "ガスタービンを選択してください。", parent=self)
             return
         self._on_save(self._bar_idx, split, new_e)
         self.destroy()
@@ -497,12 +497,12 @@ class SettingsDialog(tk.Toplevel):
         self._app_data = copy.deepcopy(app_data)
         self._on_save  = on_save
 
-        frame = tk.LabelFrame(self, text="エンジン色設定", padx=10, pady=10)
+        frame = tk.LabelFrame(self, text="ガスタービン色設定", padx=10, pady=10)
         frame.pack(padx=16, pady=12, fill="both")
 
         self._color_vars: dict[str, tk.StringVar] = {}
         for i, eng in enumerate(self._app_data.engines):
-            tk.Label(frame, text=f"エンジン {eng.id}:", anchor="e", width=14
+            tk.Label(frame, text=f"ガスタービン {eng.id}:", anchor="e", width=14
                      ).grid(row=i, column=0, sticky="e", padx=6, pady=4)
             var = tk.StringVar(value=eng.color)
             self._color_vars[eng.id] = var
@@ -533,7 +533,7 @@ class SettingsDialog(tk.Toplevel):
     def _pick_color(self, eid: str) -> None:
         from tkinter import colorchooser
         initial = self._color_vars[eid].get()
-        color = colorchooser.askcolor(color=initial, title=f"エンジン {eid} の色", parent=self)
+        color = colorchooser.askcolor(color=initial, title=f"ガスタービン {eid} の色", parent=self)
         if color and color[1]:
             self._color_vars[eid].set(color[1])
 

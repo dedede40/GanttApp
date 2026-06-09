@@ -28,6 +28,7 @@ SEG_GAP      = 20    # vertical gap between segment 1 and segment 2
 
 BAR_PAD  = 4     # vertical padding inside row for bar
 EDGE_TOL = 5     # pixels from edge to trigger resize cursor
+MIN_GAP  = timedelta(days=14)    # 隣り合う境界の最小間隔＝バー最小長（14日）
 
 SEG_H = HEADER_H + 3 * ROW_H + SEP_H + MAINT_ROW_H
 
@@ -446,69 +447,125 @@ class GanttCanvas(tk.Frame):
         else:
             self._drag_maint(br.idx, mode, snap, new_d, dx)
 
+    # ── 境界連動（タイル状スケジュールを保つ） ────────────────────────────
+    #
+    # 各タービンの時間軸は「本体バー」と「別枠バー」が隙間なく交互に並ぶ。
+    # さらに本体バーは号機ごとにも隙間なく連続する。
+    # ある「境界（日付）」を動かすと、そこに接する全バーの端が連動する。
+    #   ・同一タービンで隣り合うバー（本体↔別枠）
+    #   ・同一号機で隣り合う本体バー（号機交換）
+    # これらを連鎖的にたどり、関係する全バーを同期させる。
+
+    def _all_bars(self):
+        return list(self.app_data.machine_bars) + list(self.app_data.maintenance_bars)
+
+    @staticmethod
+    def _adjacent(a, b) -> bool:
+        """a と b が同一タービン、または同一号機（本体同士）で連動対象か。"""
+        if a.engine_id == b.engine_id:
+            return True
+        if isinstance(a, MachineBar) and isinstance(b, MachineBar):
+            return a.machine_id == b.machine_id
+        return False
+
+    def _group(self, bar, side: str):
+        """bar.<side> が接する境界に集まる全バーを (rights, lefts) で返す。
+        rights: 境界で終わるバー（end = 境界日 - 1）
+        lefts : 境界で始まるバー（start = 境界日）
+        """
+        one  = timedelta(days=1)
+        pool = self._all_bars()
+        rights, lefts = [], []
+        seen = set()
+        stack = [(bar, side)]
+        while stack:
+            b, s = stack.pop()
+            if (id(b), s) in seen:
+                continue
+            seen.add((id(b), s))
+            if s == "right":
+                if not any(b is x for x in rights):
+                    rights.append(b)
+                for ob in pool:
+                    if ob is b or not self._adjacent(b, ob):
+                        continue
+                    if ob.start == b.end + one:
+                        stack.append((ob, "left"))
+            else:  # left
+                if not any(b is x for x in lefts):
+                    lefts.append(b)
+                for ob in pool:
+                    if ob is b or not self._adjacent(b, ob):
+                        continue
+                    if ob.end == b.start - one:
+                        stack.append((ob, "right"))
+        return rights, lefts
+
+    def _move_boundary(self, bar, side: str, target: date) -> date:
+        """bar.<side> の境界を target へ動かす。連動・最小幅(14日)・押し込みを処理。
+        実際に到達した境界日を返す。"""
+        one = timedelta(days=1)
+        rights, lefts = self._group(bar, side)
+        cur = lefts[0].start if lefts else rights[0].end + one
+
+        # 全期間でクランプ
+        if target < PERIOD_START:
+            target = PERIOD_START
+        if target > PERIOD_END + one:
+            target = PERIOD_END + one
+        if target == cur:
+            return cur
+
+        if target > cur:
+            # 境界が右へ → lefts が縮む。14日未満なら相手の右境界を押す
+            for l in lefts:
+                if (l.end + one) - target < MIN_GAP:
+                    achieved = self._move_boundary(l, "right", target + MIN_GAP)
+                    if achieved - MIN_GAP < target:
+                        target = achieved - MIN_GAP
+        else:
+            # 境界が左へ → rights が縮む。14日未満なら相手の左境界を押す
+            for r in rights:
+                if target - r.start < MIN_GAP:
+                    achieved = self._move_boundary(r, "left", target - MIN_GAP)
+                    if achieved + MIN_GAP > target:
+                        target = achieved + MIN_GAP
+
+        for r in rights:
+            r.end = target - one
+        for l in lefts:
+            l.start = target
+        return target
+
     def _drag_machine(self, idx: int, mode: str, snap: MachineBar,
                       new_date: date, dx: float) -> None:
-        bars   = self.app_data.machine_bars
-        b      = bars[idx]
-        mid    = b.machine_id
-        m_bars = sorted([i for i, x in enumerate(bars) if x.machine_id == mid],
-                        key=lambda i: bars[i].start)
-        pos    = m_bars.index(idx)
-
+        b = self.app_data.machine_bars[idx]
         if mode == "right":
-            # Drag right edge: clamp to next bar's end date minus 1 day, min 1 day
-            next_end = PERIOD_END
-            if pos < len(m_bars) - 1:
-                next_bar = bars[m_bars[pos + 1]]
-                next_end = next_bar.end
-            new_end = _clamp_date(new_date, b.start, next_end)
-            if new_end == b.end:
-                return
-            b.end = new_end
-            # Adjust next bar's start
-            if pos < len(m_bars) - 1:
-                bars[m_bars[pos + 1]].start = new_end + timedelta(days=1)
-
+            self._move_boundary(b, "right", new_date + timedelta(days=1))
         elif mode == "left":
-            # Drag left edge: clamp to prev bar's start date plus 1 day
-            prev_start = PERIOD_START
-            if pos > 0:
-                prev_bar = bars[m_bars[pos - 1]]
-                prev_start = prev_bar.start
-            new_start = _clamp_date(new_date, prev_start, b.end)
-            if new_start == b.start:
-                return
-            b.start = new_start
-            if pos > 0:
-                bars[m_bars[pos - 1]].end = new_start - timedelta(days=1)
-
+            self._move_boundary(b, "left", new_date)
         self.redraw()
         self.on_change()
 
     def _drag_maint(self, idx: int, mode: str, snap: MaintenanceBar,
                     new_date: date, dx: float) -> None:
         b = self.app_data.maintenance_bars[idx]
-
         if mode == "right":
-            new_end = _clamp_date(new_date, b.start, PERIOD_END)
-            if new_end == b.end:
-                return
-            b.end = new_end
+            self._move_boundary(b, "right", new_date + timedelta(days=1))
         elif mode == "left":
-            new_start = _clamp_date(new_date, PERIOD_START, b.end)
-            if new_start == b.start:
-                return
-            b.start = new_start
+            self._move_boundary(b, "left", new_date)
         elif mode == "move":
-            orig_len  = (snap.end - snap.start).days
-            new_start = _clamp_date(new_date - timedelta(days=orig_len // 2),
-                                    PERIOD_START, PERIOD_END - timedelta(days=orig_len))
-            new_end   = new_start + timedelta(days=orig_len)
-            if new_start == b.start:
-                return
-            b.start = new_start
-            b.end   = new_end
-
+            # バー全体を平行移動（両境界を同じだけ動かしタイルを保つ）
+            center = snap.start + (snap.end - snap.start) // 2
+            delta  = (new_date - center).days
+            new_start = snap.start + timedelta(days=delta)
+            new_end   = snap.end   + timedelta(days=delta)
+            if delta > 0:   # 右へ：先に右境界を動かす
+                self._move_boundary(b, "right", new_end + timedelta(days=1))
+                self._move_boundary(b, "left",  new_start)
+            elif delta < 0:  # 左へ：先に左境界を動かす
+                self._move_boundary(b, "left",  new_start)
+                self._move_boundary(b, "right", new_end + timedelta(days=1))
         self.redraw()
         self.on_change()
 

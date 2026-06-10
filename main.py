@@ -20,6 +20,7 @@ from dialogs import (
     NewFileWizard, EditMachineBarDialog, EditMaintenanceBarDialog,
     AddMaintenanceBarDialog, InsertEngineDialog, SettingsDialog,
 )
+from maintenance_history import MaintenanceHistoryPanel
 
 # ── 未搭載バー自動生成 ────────────────────────────────────────────────────────
 
@@ -158,11 +159,21 @@ class GanttApp(tk.Tk):
         self._gantt_frame = tk.Frame(self._paned, bg="white")
         self._paned.add(self._gantt_frame, minsize=300, stretch="always")
 
-        self._summary_frame = tk.Frame(self._paned)
-        self._paned.add(self._summary_frame, minsize=140, stretch="never")
+        # 下半分：左に集計パネル、右に別枠履歴パネル
+        self._bottom_paned = tk.PanedWindow(self._paned, orient="horizontal",
+                                            sashwidth=5, bg="#D0D8E8",
+                                            sashrelief="flat")
+        self._paned.add(self._bottom_paned, minsize=140, stretch="never")
+
+        self._summary_frame = tk.Frame(self._bottom_paned)
+        self._bottom_paned.add(self._summary_frame, minsize=300, stretch="always")
+
+        self._history_frame = tk.Frame(self._bottom_paned, bg="white")
+        self._bottom_paned.add(self._history_frame, minsize=320, stretch="never")
 
         self._gantt:   GanttCanvas | None = None
         self._summary: SummaryPanel | None = None
+        self._history: MaintenanceHistoryPanel | None = None
 
         # Status bar
         self._status_var = tk.StringVar(value="ファイルを開いてください")
@@ -228,6 +239,11 @@ class GanttApp(tk.Tk):
         self._summary = SummaryPanel(self._summary_frame, self._app_data)
         self._summary.pack(fill="both", expand=True)
 
+        for w in self._history_frame.winfo_children():
+            w.destroy()
+        self._history = MaintenanceHistoryPanel(self._history_frame, self._app_data)
+        self._history.pack(fill="both", expand=True)
+
     # ── Dirty tracking ────────────────────────────────────────────────────────
 
     def _on_data_change(self) -> None:
@@ -235,6 +251,8 @@ class GanttApp(tk.Tk):
         self._update_title()
         if self._summary:
             self._summary.refresh()
+        if self._history:
+            self._history.refresh()
 
     def _update_title(self) -> None:
         fname = Path(self._file_path).name if self._file_path else "新規ファイル"

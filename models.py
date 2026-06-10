@@ -50,6 +50,7 @@ class MaintenanceBar:
     start: date
     end: date
     status: str
+    required_duration: str = ""  # 必要工期（数値または"不明"）
 
 
 @dataclass

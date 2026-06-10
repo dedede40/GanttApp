@@ -11,7 +11,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from models import (AppData, MachineBar, MaintenanceBar,
-                    MACHINE_IDS, PERIOD_START, PERIOD_END, ENGINE_IDS)
+                    MACHINE_IDS, PERIOD_START, PERIOD_END, ENGINE_IDS, engine_by_id)
 from data_io import load_json, save_json
 from validation import validate
 from gantt_canvas import GanttCanvas
@@ -98,8 +98,10 @@ class GanttApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("GanttApp")
-        self.minsize(900, 540)
-        self.geometry("1280x780")
+        self.minsize(820, 600)
+        self.geometry("1280x700")
+        self._win_resize_job = None
+        self.bind("<Configure>", self._on_win_resize)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self._app_data: AppData | None = None
@@ -154,7 +156,7 @@ class GanttApp(tk.Tk):
 
     def _build_ui(self) -> None:
         self._paned = tk.PanedWindow(self, orient="vertical", sashwidth=6,
-                                     bg="#D0D8E8", sashrelief="flat")
+                                     bg="white", sashrelief="flat")
         self._paned.pack(fill="both", expand=True)
 
         self._gantt_frame = tk.Frame(self._paned, bg="white")
@@ -162,12 +164,12 @@ class GanttApp(tk.Tk):
 
         # 下半分：左に集計パネル、右に別枠履歴パネル
         self._bottom_paned = tk.PanedWindow(self._paned, orient="horizontal",
-                                            sashwidth=5, bg="#D0D8E8",
+                                            sashwidth=5, bg="white",
                                             sashrelief="flat")
         self._paned.add(self._bottom_paned, minsize=140, stretch="never")
 
         self._summary_frame = tk.Frame(self._bottom_paned)
-        self._bottom_paned.add(self._summary_frame, minsize=300, stretch="always")
+        self._bottom_paned.add(self._summary_frame, minsize=200, stretch="always")
 
         self._history_frame = tk.Frame(self._bottom_paned, bg="white")
         self._bottom_paned.add(self._history_frame, minsize=320, stretch="never")
@@ -175,6 +177,9 @@ class GanttApp(tk.Tk):
         self._gantt:   GanttCanvas | None = None
         self._summary: SummaryPanel | None = None
         self._history: MaintenanceHistoryPanel | None = None
+
+        # 描画後にサッシ位置を最適化
+        self.after(150, self._fit_sash)
 
         # Status bar
         self._status_var = tk.StringVar(value="ファイルを開いてください")
@@ -237,12 +242,19 @@ class GanttApp(tk.Tk):
         )
         self._gantt.pack(fill="both", expand=True)
 
-        self._summary = SummaryPanel(self._summary_frame, self._app_data)
+        self._summary = SummaryPanel(
+            self._summary_frame, self._app_data,
+            on_init_h_change=self._on_init_h_change,
+        )
         self._summary.pack(fill="both", expand=True)
 
         for w in self._history_frame.winfo_children():
             w.destroy()
-        self._history = MaintenanceHistoryPanel(self._history_frame, self._app_data)
+        self._history = MaintenanceHistoryPanel(
+            self._history_frame, self._app_data,
+            on_status_change=self._on_maint_status_change,
+            on_reqdur_change=self._on_maint_reqdur_change,
+        )
         self._history.pack(fill="both", expand=True)
 
     # ── Dirty tracking ────────────────────────────────────────────────────────
@@ -380,6 +392,31 @@ class GanttApp(tk.Tk):
                             f"data/default.json を更新しました。\n未搭載バー {len(data.maintenance_bars)} 件を自動生成しました。",
                             parent=self)
 
+    def _on_win_resize(self, event) -> None:
+        """ウィンドウリサイズ時に垂直サッシを追従させる（デバウンス付き）。"""
+        if event.widget is not self:
+            return
+        if self._win_resize_job:
+            self.after_cancel(self._win_resize_job)
+        self._win_resize_job = self.after(80, self._fit_sash)
+
+    def _fit_sash(self) -> None:
+        """垂直サッシ：ガント2段を優先し、下パネルを縮める。水平サッシ：初回のみ設定。"""
+        from gantt_canvas import CANVAS_H
+        from maintenance_history import COL_W
+        self.update_idletasks()
+        # 垂直サッシ：ガントキャンバス＋内部パッド＋スクロールバーが収まる高さ
+        gantt_h = CANVAS_H + 10 + 17   # 上パッド10 ＋ 水平スクロールバー17
+        self._paned.sash_place(0, 0, gantt_h)
+        # 水平サッシ：集計列幅ちょうどの位置に固定（初回のみ）
+        if not getattr(self, "_hsash_set", False):
+            from summary_panel import SummaryPanel as _SP
+            # 集計パネルの列幅合計＋スクロールバー＋パディング
+            sum_col_total = 70 + 118 + 110 + 95   # engine+init_h+accum_h+total_days
+            summary_w = sum_col_total + 30
+            self._bottom_paned.sash_place(0, summary_w, 0)
+            self._hsash_set = True
+
     def _confirm_discard(self) -> bool:
         if not self._modified:
             return True
@@ -435,6 +472,30 @@ class GanttApp(tk.Tk):
                     f"{bars[i].engine_id} → {bars[i+1].engine_id} 間に隙間または重複があります"
                 )
         return errors
+
+    def _on_init_h_change(self, engine_id: str, new_hours: float) -> None:
+        eng = engine_by_id(self._app_data, engine_id)
+        if eng:
+            eng.initial_hours = new_hours
+        self._on_data_change()
+        if self._summary:
+            self._summary.refresh()
+
+    def _on_maint_status_change(self, row_idx: int, new_status: str) -> None:
+        from maintenance_history import _history_bars
+        bars = _history_bars(self._app_data)
+        if 0 <= row_idx < len(bars):
+            bars[row_idx].status = new_status
+            self._on_data_change()
+            if self._gantt:
+                self._gantt.redraw()
+
+    def _on_maint_reqdur_change(self, row_idx: int, new_value: str) -> None:
+        from maintenance_history import _history_bars
+        bars = _history_bars(self._app_data)
+        if 0 <= row_idx < len(bars):
+            bars[row_idx].required_duration = new_value.strip()
+            self._on_data_change()
 
     def _on_maint_bar_saved(self, bar: MaintenanceBar) -> None:
         self._on_data_change()

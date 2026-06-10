@@ -26,14 +26,15 @@ MAINT_ROW_H  = 58    # height of maintenance row (2-line text)
 SEP_H        = 10    # separator between machine rows and maintenance row
 SEG_GAP      = 20    # vertical gap between segment 1 and segment 2
 
-BAR_PAD  = 4     # vertical padding inside row for bar
-EDGE_TOL = 5     # pixels from edge to trigger resize cursor
-MIN_GAP  = timedelta(days=14)    # 隣り合う境界の最小間隔＝バー最小長（14日）
+BAR_PAD      = 4     # vertical padding inside row for bar
+EDGE_TOL     = 5     # pixels from edge to trigger resize cursor
+MIN_GAP      = timedelta(days=14)   # 隣り合う境界の最小間隔＝バー最小長（14日）
+MIN_MONTH_W  = 12.0  # これ以下になると横スクロールバーで対応
 
 SEG_H = HEADER_H + 3 * ROW_H + SEP_H + MAINT_ROW_H
 
 SEG_MONTHS = 48                              # 4年×12ヶ月
-CANVAS_W = LABEL_W + SEG_MONTHS * MONTH_W
+CANVAS_W = LABEL_W + SEG_MONTHS * MONTH_W   # デフォルト幅（初期化用）
 CANVAS_H = 2 * SEG_H + SEG_GAP
 
 MONTHS_SHORT = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]
@@ -60,26 +61,26 @@ def _seg_ref(seg: int) -> date:
     return date(2026 + seg * 4, 1, 1)
 
 
-def _date_to_x(d: date, seg: int) -> float:
+def _date_to_x(d: date, seg: int, mw: float = MONTH_W) -> float:
     """Left-edge x for a date within a segment."""
     ref = _seg_ref(seg)
     months = (d.year - ref.year) * 12 + (d.month - ref.month)
     frac   = (d.day - 1) / days_in_month(d.year, d.month)
-    return LABEL_W + (months + frac) * MONTH_W
+    return LABEL_W + (months + frac) * mw
 
 
-def _date_to_x2(d: date, seg: int) -> float:
+def _date_to_x2(d: date, seg: int, mw: float = MONTH_W) -> float:
     """Right-edge x for a date within a segment."""
     ref = _seg_ref(seg)
     months = (d.year - ref.year) * 12 + (d.month - ref.month)
     frac   = d.day / days_in_month(d.year, d.month)
-    return LABEL_W + (months + frac) * MONTH_W
+    return LABEL_W + (months + frac) * mw
 
 
-def _x_to_date(x: float, seg: int) -> date:
+def _x_to_date(x: float, seg: int, mw: float = MONTH_W) -> date:
     """Convert canvas x to date within segment seg, snapped to day."""
     ref  = _seg_ref(seg)
-    frac = max(0.0, (x - LABEL_W) / MONTH_W)
+    frac = max(0.0, (x - LABEL_W) / mw)
     frac = min(frac, SEG_MONTHS - 1e-9)
     mi   = int(frac)
     df   = frac - mi
@@ -107,8 +108,8 @@ def _seg_x_left(seg: int) -> float:
     return LABEL_W
 
 
-def _seg_x_right(seg: int) -> float:
-    return LABEL_W + 60 * MONTH_W
+def _seg_x_right(seg: int, mw: float = MONTH_W) -> float:
+    return LABEL_W + SEG_MONTHS * mw
 
 
 # ── Bar info records ──────────────────────────────────────────────────────────
@@ -136,24 +137,39 @@ class GanttCanvas(tk.Frame):
         self.on_change      = on_change          # () -> None
         self._open_edit     = open_edit_dialog   # (kind, idx, seg) -> None
 
+        self.configure(bg="white")
         self._canvas = tk.Canvas(self, bg="white", highlightthickness=0)
-        self._hbar   = ttk.Scrollbar(self, orient="horizontal", command=self._canvas.xview)
-        self._vbar   = ttk.Scrollbar(self, orient="vertical",   command=self._canvas.yview)
+        # tk.Scrollbar を使うと bg/troughcolor が確実に反映される
+        self._hbar   = tk.Scrollbar(self, orient="horizontal",
+                                    bg="#A0A0A0", troughcolor="white",
+                                    activebackground="#707070",
+                                    highlightthickness=0, bd=0,
+                                    command=self._canvas.xview)
+        self._vbar   = tk.Scrollbar(self, orient="vertical",
+                                    bg="#A0A0A0", troughcolor="white",
+                                    activebackground="#707070",
+                                    highlightthickness=0, bd=0,
+                                    command=self._canvas.yview)
         self._canvas.configure(
             xscrollcommand=self._hbar.set,
             yscrollcommand=self._vbar.set,
             scrollregion=(0, 0, CANVAS_W, CANVAS_H),
         )
 
-        self._canvas.grid(row=0, column=0, sticky="nsew")
-        self._vbar.grid(row=0, column=1, sticky="ns")
-        self._hbar.grid(row=1, column=0, sticky="ew")
+        # キャンバスに左・上パッドを付け、スクロールバーはその右・下に自然配置
+        self._canvas.grid(row=0, column=0, sticky="nsew", padx=(10, 8), pady=(10, 0))
+        self._vbar.grid(row=0, column=1, sticky="ns",     padx=(0, 0), pady=(10, 0))
+        self._hbar.grid(row=1, column=0, sticky="ew",     padx=(10, 0), pady=(0, 0))
+        # 右下コーナーの余白（スクロールバー交差部）
+        tk.Frame(self, bg="white", width=17, height=17).grid(row=1, column=1)
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
         self._tooltip  = Tooltip(self._canvas)
         self._bars: List[BarRecord] = []   # hit-test list
         self._drag: Optional[Dict[str, Any]] = None
+        self._month_w: float = float(MONTH_W)
+        self._resize_job = None
 
         self._canvas.bind("<ButtonPress-1>",   self._on_press)
         self._canvas.bind("<B1-Motion>",        self._on_drag)
@@ -162,6 +178,7 @@ class GanttCanvas(tk.Frame):
         self._canvas.bind("<Button-3>",         self._on_right)
         self._canvas.bind("<Motion>",           self._on_motion)
         self._canvas.bind("<Leave>",            lambda _: self._tooltip.hide())
+        self.bind("<Configure>",               self._on_frame_resize)
 
         self.redraw()
 
@@ -169,6 +186,27 @@ class GanttCanvas(tk.Frame):
 
     def set_data(self, app_data: AppData) -> None:
         self.app_data = app_data
+        self.redraw()
+
+    # ── 横方向リサイズ ────────────────────────────────────────────────────────
+
+    def _on_frame_resize(self, event) -> None:
+        if event.widget is not self:
+            return
+        if self._resize_job:
+            self.after_cancel(self._resize_job)
+        self._resize_job = self.after(60, lambda w=event.width: self._apply_resize(w))
+
+    def _apply_resize(self, width: int) -> None:
+        self._resize_job = None
+        # フレーム幅から左パッド(10)・右パッド(8)・縦スクロールバー(17)を除いた分
+        avail = width - 10 - 8 - 17
+        new_mw = max(MIN_MONTH_W, (avail - LABEL_W) / SEG_MONTHS)
+        if abs(new_mw - self._month_w) < 0.3:
+            return
+        self._month_w = new_mw
+        cw = LABEL_W + SEG_MONTHS * self._month_w
+        self._canvas.configure(scrollregion=(0, 0, cw, CANVAS_H))
         self.redraw()
 
     def redraw(self) -> None:
@@ -198,17 +236,17 @@ class GanttCanvas(tk.Frame):
             ref    = _seg_ref(seg)
 
             # ── Year header row ──────────────────────────────────────────
+            mw     = self._month_w
             year_y = sy
             col_y  = sy + YEAR_H
             for mi in range(SEG_MONTHS):
                 m  = add_months(ref, mi)
-                x1 = LABEL_W + mi * MONTH_W
 
                 if mi == 0 or m.month == 1:
                     yr = m.year
                     yr_end_mi = min(SEG_MONTHS - 1, mi + 11)
-                    yr_x1 = LABEL_W + mi * MONTH_W
-                    yr_x2 = LABEL_W + (yr_end_mi + 1) * MONTH_W
+                    yr_x1 = LABEL_W + mi * mw
+                    yr_x2 = LABEL_W + (yr_end_mi + 1) * mw
                     c.create_rectangle(yr_x1, year_y, yr_x2, year_y + YEAR_H,
                                        fill=HEAD_BG, outline=FG)
                     c.create_text(
@@ -220,12 +258,12 @@ class GanttCanvas(tk.Frame):
             # ── Month header row ─────────────────────────────────────────
             for mi in range(SEG_MONTHS):
                 m  = add_months(ref, mi)
-                x1 = LABEL_W + mi * MONTH_W
-                x2 = x1 + MONTH_W
+                x1 = LABEL_W + mi * mw
+                x2 = x1 + mw
                 c.create_rectangle(x1, col_y, x2, col_y + MONTH_H,
                                    fill=HEAD_BG, outline=FG)
                 c.create_text(
-                    x1 + MONTH_W / 2, col_y + MONTH_H / 2,
+                    x1 + mw / 2, col_y + MONTH_H / 2,
                     text=MONTHS_SHORT[m.month - 1], fill=FG,
                     font=("Meiryo UI", 7), anchor="center",
                 )
@@ -234,7 +272,7 @@ class GanttCanvas(tk.Frame):
             row_top = _seg_y(seg) + HEADER_H
             row_bot = _maint_row_y(seg) + ROW_H
             for mi in range(SEG_MONTHS + 1):
-                x = LABEL_W + mi * MONTH_W
+                x = LABEL_W + mi * mw
                 c.create_line(x, row_top, x, row_bot, fill=GRID)
 
             # ── Horizontal row lines ─────────────────────────────────────
@@ -304,8 +342,8 @@ class GanttCanvas(tk.Frame):
 
         row = MACHINE_IDS.index(b.machine_id)
         ry  = _machine_row_y(seg, row)
-        x1  = _date_to_x(cs,  seg)
-        x2  = _date_to_x2(ce, seg)
+        x1  = _date_to_x(cs,  seg, self._month_w)
+        x2  = _date_to_x2(ce, seg, self._month_w)
         y1  = ry + BAR_PAD
         y2  = ry + ROW_H - BAR_PAD
 
@@ -344,8 +382,8 @@ class GanttCanvas(tk.Frame):
             return
 
         my = _maint_row_y(seg)
-        x1 = _date_to_x(cs,  seg)
-        x2 = _date_to_x2(ce, seg)
+        x1 = _date_to_x(cs,  seg, self._month_w)
+        x2 = _date_to_x2(ce, seg, self._month_w)
         y1 = my + BAR_PAD
         y2 = my + MAINT_ROW_H - BAR_PAD
         cx = (x1 + x2) / 2
@@ -434,13 +472,8 @@ class GanttCanvas(tk.Frame):
         seg  = drag["seg"]
         mode = drag["mode"]
         snap = drag["bar_snap"]
-        dx   = cx - drag["cx_start"]
-        days_per_px = 1.0 / (MONTH_W / 30.44)
-
-        def px_to_days(px: float) -> int:
-            return round(px / MONTH_W * 30.44)
-
-        new_d = _x_to_date(cx, seg)
+        dx    = cx - drag["cx_start"]
+        new_d = _x_to_date(cx, seg, self._month_w)
 
         if br.kind == "machine":
             self._drag_machine(br.idx, mode, snap, new_d, dx)
@@ -593,7 +626,7 @@ class GanttCanvas(tk.Frame):
         menu.add_command(label="編集…", command=lambda: self._open_edit(br.kind, br.idx, br.seg))
         if br.kind == "machine":
             menu.add_separator()
-            seg_date = _x_to_date(cx, br.seg)
+            seg_date = _x_to_date(cx, br.seg, self._month_w)
             menu.add_command(
                 label=f"ここでガスタービン交換 ({seg_date.strftime('%Y/%m/%d')})",
                 command=lambda d=seg_date, b=br: self._open_edit("insert", b.idx, d),
@@ -619,7 +652,7 @@ class GanttCanvas(tk.Frame):
         self.on_change()
 
     def _show_machine_row_menu(self, event, mid: str, cx: float, seg: int) -> None:
-        seg_date = _x_to_date(cx, seg)
+        seg_date = _x_to_date(cx, seg, self._month_w)
         menu = tk.Menu(self, tearoff=0)
         # Find last bar in machine to determine insert point
         bars  = [b for b in self.app_data.machine_bars if b.machine_id == mid]

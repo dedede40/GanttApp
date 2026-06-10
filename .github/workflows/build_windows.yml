@@ -2,7 +2,8 @@ name: Build Windows EXE
 
 on:
   push:
-    branches: [main]
+    tags:
+      - "v*"
   workflow_dispatch:
 
 jobs:
@@ -30,14 +31,24 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist\GanttApp\save
           Copy-Item -Path "README_配布用.txt" -Destination "dist\GanttApp\" -ErrorAction SilentlyContinue
 
+      - name: バージョン名を取得
+        id: ver
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          echo "tag=$tag" >> $env:GITHUB_OUTPUT
+
       - name: ZIP に圧縮
         shell: pwsh
         run: |
-          Compress-Archive -Path dist\GanttApp\* -DestinationPath GanttApp_v1.zip
+          $zip = "GanttApp_${{ steps.ver.outputs.tag }}.zip"
+          Compress-Archive -Path dist\GanttApp\* -DestinationPath $zip
+          echo "ZIP_NAME=$zip" >> $env:GITHUB_ENV
 
-      - name: ZIP をアップロード
-        uses: actions/upload-artifact@v4
+      - name: GitHub Release を作成して ZIP を添付
+        uses: softprops/action-gh-release@v2
         with:
-          name: GanttApp_v1
-          path: GanttApp_v1.zip
-          retention-days: 90
+          tag_name: ${{ github.ref_name }}
+          name: "GanttApp ${{ github.ref_name }}"
+          files: ${{ env.ZIP_NAME }}
+          generate_release_notes: false

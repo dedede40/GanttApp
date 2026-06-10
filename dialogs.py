@@ -326,7 +326,7 @@ class EditMaintenanceBarDialog(tk.Toplevel):
 
         self._start  = _label_date(frame, "開始日:", 1, bar.start)
         self._end    = _label_date(frame, "終了日:", 2, bar.end)
-        self._status = _label_combo(frame, "状態:", 3, MAINTENANCE_STATUSES, bar.status)
+        self._status = _label_entry(frame, "点検種別:", 3, bar.status or "", width=16)
 
         btn_frame = tk.Frame(self)
         btn_frame.pack(pady=(0, 12))
@@ -340,10 +340,7 @@ class EditMaintenanceBarDialog(tk.Toplevel):
     def _save(self) -> None:
         start  = self._start.get()
         end    = self._end.get()
-        status = self._status.get()
-        if not status:
-            messagebox.showerror("エラー", "状態を選択してください。", parent=self)
-            return
+        status = self._status.get().strip()
         if end < start:
             messagebox.showerror("エラー", "終了日が開始日より前です。", parent=self)
             return
@@ -374,8 +371,7 @@ class AddMaintenanceBarDialog(tk.Toplevel):
         self._engine = _label_combo(frame, "ガスタービン:", 0, ENGINE_IDS, ENGINE_IDS[0])
         self._start  = _label_date(frame, "開始日:", 1, PERIOD_START)
         self._end    = _label_date(frame, "終了日:", 2, date(2025, 3, 31))
-        self._status = _label_combo(frame, "状態:", 3, MAINTENANCE_STATUSES,
-                                    MAINTENANCE_STATUSES[0])
+        self._status = _label_entry(frame, "点検種別:", 3, "", width=16)
 
         btn_frame = tk.Frame(self)
         btn_frame.pack(pady=(0, 12))
@@ -390,10 +386,7 @@ class AddMaintenanceBarDialog(tk.Toplevel):
         eid    = self._engine.get()
         start  = self._start.get()
         end    = self._end.get()
-        status = self._status.get()
-        if not status:
-            messagebox.showerror("エラー", "状態を選択してください。", parent=self)
-            return
+        status = self._status.get().strip()
         if end < start:
             messagebox.showerror("エラー", "終了日が開始日より前です。", parent=self)
             return

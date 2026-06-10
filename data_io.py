@@ -49,6 +49,7 @@ def load_json(path: str) -> AppData:
             start=parse_date8(str(_req(b, "start"))),
             end=parse_date8(str(_req(b, "end"))),
             status=str(_req(b, "status")),
+            required_duration=str(b.get("required_duration", "")),
         ))
 
     return AppData(engines=engines, machine_bars=machine_bars, maintenance_bars=maintenance_bars)
@@ -80,6 +81,7 @@ def save_json(app_data: AppData, path: str) -> None:
                     "start": dump_date8(b.start),
                     "end": dump_date8(b.end),
                     "status": b.status,
+                    "required_duration": b.required_duration,
                 }
                 for b in app_data.maintenance_bars
             ],

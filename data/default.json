@@ -2,22 +2,22 @@
   "engines": [
     {
       "id": "1868",
-      "color": "#FFBB77",
+      "color": "#FF9900",
       "initial_hours": 12000.0
     },
     {
       "id": "2445",
-      "color": "#FFB6C1",
+      "color": "#CC4466",
       "initial_hours": 8000.0
     },
     {
       "id": "2446",
-      "color": "#87CEEB",
+      "color": "#0088CC",
       "initial_hours": 5000.0
     },
     {
       "id": "2450",
-      "color": "#FFD700",
+      "color": "#33AA55",
       "initial_hours": 3000.0
     }
   ],
@@ -222,166 +222,172 @@
     ],
     "maintenance_bars": [
       {
-        "engine_id": "1868",
-        "start": "20261002",
-        "end": "20270201",
-        "status": "6k点検"
-      },
-      {
-        "engine_id": "1868",
-        "start": "20280204",
-        "end": "20280501",
-        "status": "6k点検"
-      },
-      {
-        "engine_id": "1868",
-        "start": "20290303",
-        "end": "20290607",
-        "status": "6k点検"
-      },
-      {
-        "engine_id": "1868",
-        "start": "20300621",
-        "end": "20300830",
-        "status": "6k点検"
-      },
-      {
-        "engine_id": "1868",
-        "start": "20310629",
-        "end": "20310928",
-        "status": "6k点検"
-      },
-      {
-        "engine_id": "1868",
-        "start": "20320801",
-        "end": "20331231",
-        "status": "6k点検"
-      },
-      {
-        "engine_id": "2445",
-        "start": "20260402",
-        "end": "20260628",
-        "status": "6k点検"
-      },
-      {
-        "engine_id": "2445",
-        "start": "20270530",
-        "end": "20270813",
-        "status": "6k点検"
-      },
-      {
-        "engine_id": "2445",
-        "start": "20280502",
-        "end": "20280601",
-        "status": "6k点検"
-      },
-      {
-        "engine_id": "2445",
-        "start": "20290608",
-        "end": "20291031",
-        "status": "6k点検"
-      },
-      {
-        "engine_id": "2445",
-        "start": "20300831",
-        "end": "20301201",
-        "status": "6k点検"
-      },
-      {
-        "engine_id": "2445",
-        "start": "20310929",
-        "end": "20320426",
-        "status": "6k点検"
-      },
-      {
-        "engine_id": "2445",
-        "start": "20330402",
-        "end": "20331231",
-        "status": "6k点検"
-      },
-      {
-        "engine_id": "2446",
-        "start": "20260629",
-        "end": "20261001",
-        "status": "6k点検"
-      },
-      {
-        "engine_id": "2446",
-        "start": "20270814",
-        "end": "20280203",
-        "status": "6k点検"
+        "engine_id": "2450",
+        "start": "20280602",
+        "end": "20281218",
+        "status": "12k点検",
+        "required_duration": "6.5"
       },
       {
         "engine_id": "2446",
         "start": "20281219",
         "end": "20290302",
-        "status": "6k点検"
+        "status": "96k点検（OH）＋PTO軸受交換",
+        "required_duration": "3"
+      },
+      {
+        "engine_id": "1868",
+        "start": "20290303",
+        "end": "20290607",
+        "status": "12k点検＋PTO軸受交換",
+        "required_duration": "3"
+      },
+      {
+        "engine_id": "2445",
+        "start": "20290608",
+        "end": "20291031",
+        "status": "12k点検",
+        "required_duration": "5"
       },
       {
         "engine_id": "2446",
         "start": "20291101",
         "end": "20291202",
-        "status": "6k点検"
-      },
-      {
-        "engine_id": "2446",
-        "start": "20301202",
-        "end": "20310504",
-        "status": "6k点検"
-      },
-      {
-        "engine_id": "2446",
-        "start": "20320427",
-        "end": "20320531",
-        "status": "6k点検"
-      },
-      {
-        "engine_id": "2446",
-        "start": "20330330",
-        "end": "20331231",
-        "status": "6k点検"
-      },
-      {
-        "engine_id": "2450",
-        "start": "20260101",
-        "end": "20260401",
-        "status": "6k点検"
-      },
-      {
-        "engine_id": "2450",
-        "start": "20270202",
-        "end": "20270529",
-        "status": "6k点検"
-      },
-      {
-        "engine_id": "2450",
-        "start": "20280602",
-        "end": "20281218",
-        "status": "6k点検"
+        "status": "6k点検",
+        "required_duration": "1"
       },
       {
         "engine_id": "2450",
         "start": "20291203",
         "end": "20300620",
-        "status": "6k点検"
+        "status": "96k点検（OH）",
+        "required_duration": "4"
+      },
+      {
+        "engine_id": "1868",
+        "start": "20300621",
+        "end": "20300830",
+        "status": "6k点検＋PTO軸受交換",
+        "required_duration": "5"
+      },
+      {
+        "engine_id": "2445",
+        "start": "20300831",
+        "end": "20301201",
+        "status": "6k点検",
+        "required_duration": "3"
+      },
+      {
+        "engine_id": "2446",
+        "start": "20301202",
+        "end": "20310504",
+        "status": "12k点検",
+        "required_duration": "5"
       },
       {
         "engine_id": "2450",
         "start": "20310505",
         "end": "20310628",
-        "status": "6k点検"
+        "status": "6k点検",
+        "required_duration": "2"
+      },
+      {
+        "engine_id": "1868",
+        "start": "20310629",
+        "end": "20310928",
+        "status": "12k点検＋PTO軸受交換",
+        "required_duration": "3"
+      },
+      {
+        "engine_id": "2445",
+        "start": "20310929",
+        "end": "20320426",
+        "status": "12k点検＋PTO軸受交換",
+        "required_duration": "7"
+      },
+      {
+        "engine_id": "2446",
+        "start": "20320427",
+        "end": "20320531",
+        "status": "6k点検",
+        "required_duration": "1"
       },
       {
         "engine_id": "2450",
         "start": "20320601",
         "end": "20320731",
-        "status": "6k点検"
+        "status": "12k点検",
+        "required_duration": "2"
+      },
+      {
+        "engine_id": "1868",
+        "start": "20320801",
+        "end": "20330331",
+        "status": "降ろすだけ",
+        "required_duration": "不明"
       },
       {
         "engine_id": "2450",
-        "start": "20330330",
-        "end": "20331231",
-        "status": "6k点検"
+        "start": "20260101",
+        "end": "20260401",
+        "status": "搭載待機",
+        "required_duration": ""
+      },
+      {
+        "engine_id": "2445",
+        "start": "20260402",
+        "end": "20260628",
+        "status": "搭載待機",
+        "required_duration": ""
+      },
+      {
+        "engine_id": "2446",
+        "start": "20260629",
+        "end": "20261001",
+        "status": "搭載待機",
+        "required_duration": ""
+      },
+      {
+        "engine_id": "1868",
+        "start": "20261002",
+        "end": "20270201",
+        "status": "搭載待機",
+        "required_duration": ""
+      },
+      {
+        "engine_id": "1868",
+        "start": "20280204",
+        "end": "20280501",
+        "status": "搭載待機",
+        "required_duration": ""
+      },
+      {
+        "engine_id": "2445",
+        "start": "20270530",
+        "end": "20270813",
+        "status": "搭載待機",
+        "required_duration": ""
+      },
+      {
+        "engine_id": "2445",
+        "start": "20280502",
+        "end": "20280601",
+        "status": "搭載待機",
+        "required_duration": ""
+      },
+      {
+        "engine_id": "2446",
+        "start": "20270814",
+        "end": "20280203",
+        "status": "搭載待機",
+        "required_duration": ""
+      },
+      {
+        "engine_id": "2450",
+        "start": "20270202",
+        "end": "20270529",
+        "status": "搭載待機",
+        "required_duration": ""
       }
     ]
   }

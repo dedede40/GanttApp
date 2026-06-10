@@ -9,8 +9,8 @@ from models import AppData
 HISTORY_START = date(2028, 6, 1)
 
 COLUMNS = ("count", "engine", "days", "status")
-COL_HEADS = {"count": "回数", "engine": "タービン", "days": "別枠期間(日)", "status": "点検種別"}
-COL_W     = {"count": 46, "engine": 72, "days": 88, "status": 90}
+COL_HEADS = {"count": "回数", "engine": "タービン", "days": "点検整備期間(日)", "status": "点検種別"}
+COL_W     = {"count": 46, "engine": 72, "days": 108, "status": 90}
 
 
 def _history_rows(app_data: AppData) -> list[tuple]:

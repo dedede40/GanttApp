@@ -128,13 +128,14 @@ class GanttApp(tk.Tk):
 
         file_menu = tk.Menu(mb, tearoff=0)
         mb.add_cascade(label="ファイル", menu=file_menu)
-        file_menu.add_command(label="新規作成…",     command=self._new_file,        accelerator="Ctrl+N")
-        file_menu.add_command(label="開く…",         command=self._open_file,       accelerator="Ctrl+O")
+        file_menu.add_command(label="新規作成…",       command=self._new_file,         accelerator="Ctrl+N")
+        file_menu.add_command(label="開く…",          command=self._open_file,        accelerator="Ctrl+O")
+        file_menu.add_command(label="初期計画に戻す", command=self._load_default)
         file_menu.add_separator()
-        file_menu.add_command(label="上書き保存",    command=self._save_file,       accelerator="Ctrl+S")
-        file_menu.add_command(label="名前を付けて保存…", command=self._save_as,     accelerator="Ctrl+Shift+S")
+        file_menu.add_command(label="上書き保存",     command=self._save_file,        accelerator="Ctrl+S")
+        file_menu.add_command(label="名前を付けて保存…", command=self._save_as,       accelerator="Ctrl+Shift+S")
         file_menu.add_separator()
-        file_menu.add_command(label="終了",          command=self._on_close)
+        file_menu.add_command(label="終了",           command=self._on_close)
 
         edit_menu = tk.Menu(mb, tearoff=0)
         mb.add_cascade(label="編集", menu=edit_menu)
@@ -284,10 +285,28 @@ class GanttApp(tk.Tk):
         if path:
             self._load_file(path)
 
+    def _load_default(self) -> None:
+        if not self._confirm_discard():
+            return
+        result = messagebox.askyesno(
+            "初期計画に戻す",
+            "初期計画（data/default.json）を読み込みます。\n"
+            "現在の編集内容は破棄されます。よろしいですか？",
+            parent=self,
+        )
+        if result:
+            self._load_file(str(DEFAULT_JSON))
+            # 初期データとして読み込んだことを明示するため file_path をリセット
+            self._file_path = None
+            self._modified  = False
+            self._update_title()
+            self._status_var.set("初期計画を読み込みました（保存先は save/ フォルダです）")
+
     def _save_file(self) -> None:
         if self._app_data is None:
             return
-        if self._file_path is None:
+        # 未保存 or 初期データのまま → 必ず save/ フォルダへ名前を付けて保存
+        if self._file_path is None or Path(self._file_path).resolve() == DEFAULT_JSON.resolve():
             self._save_as()
             return
         errors = validate(self._app_data)
